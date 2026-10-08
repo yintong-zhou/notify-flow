@@ -22,12 +22,22 @@
     }
   ],
 
+  // Daily purge of delivery log rows older than 30 days (UTC cron).
+  "triggers": { "crons": ["0 3 * * *"] },
+
   // Per-client rate limit on every /v1/* route.
   "ratelimits": [
     {
       "name": "CLIENT_RATE_LIMITER",         // name used in code — do not change
       "namespace_id": "1001",                // any integer, unique within your Cloudflare account
       "simple": { "limit": 60, "period": 60 } // requests per period; period must be 10 or 60 seconds
+    },
+    // Per-IP limit on every /v1/* route, checked before the API key: caps anonymous traffic hitting D1.
+    // Keep it above 60 x the number of clients that share one egress IP.
+    {
+      "name": "IP_RATE_LIMITER",             // name used in code — do not change
+      "namespace_id": "1002",
+      "simple": { "limit": 300, "period": 60 }
     }
   ],
 

@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { handle } from "../src/index";
+import { purgeDeliveries } from "../src/services/email-service";
 import { SmtpError } from "../src/smtp/smtp-client";
 import { call, createClient, insertTemplate, recorder } from "./helpers";
 
@@ -114,6 +115,16 @@ describe("POST /v1/email/send", () => {
     expect(rec.messages).toHaveLength(5);
   });
 
+  it("holds the recipient limit under a concurrent burst", async () => {
+    const { key } = await createClient();
+    const rec = recorder();
+    const to = `burst-${crypto.randomUUID()}@example.com`;
+    const statuses = await Promise.all(Array.from({ length: 10 }, () => send(key, welcome(to), rec.send).then((r) => r.status)));
+    expect(statuses.filter((s) => s === 200)).toHaveLength(5);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(5);
+    expect(rec.messages).toHaveLength(5);
+  });
+
   it("keeps the recipient limit separate for each client", async () => {
     const a = await createClient("a");
     const b = await createClient("b");
@@ -181,6 +192,17 @@ describe("POST /v1/email/send", () => {
     expect(await row(body.id)).toMatchObject({ status: "failed", attempts: 3, error_code: "smtp_timeout" });
   });
 
+  it("does not retry an unconfirmed send", async () => {
+    const { key } = await createClient();
+    const rec = recorder(new SmtpError("smtp_unconfirmed", false, "No reply to the end of DATA"));
+    const res = await send(key, welcome(`u-${crypto.randomUUID()}@example.com`), rec.send);
+    expect(res.status).toBe(502);
+    const body = await res.json<any>();
+    expect(body.error.message).toMatch(/may still be delivered/);
+    expect(await row(body.id)).toMatchObject({ status: "failed", attempts: 1, error_code: "smtp_unconfirmed" });
+    expect(rec.messages).toHaveLength(1);
+  });
+
   it("does not retry a permanent failure and keeps the idempotent result", async () => {
     const { key } = await createClient();
     const rec = recorder(new SmtpError("smtp_rejected", false, "SMTP 550"));
@@ -226,5 +248,23 @@ describe("POST /v1/email/send", () => {
     const { key } = await createClient();
     const res = await send(key, welcome("a@example.com"), recorder().send, { "Idempotency-Key": "k".repeat(256) });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("purgeDeliveries", () => {
+  it("deletes rows older than 30 days and keeps recent ones", async () => {
+    const { id: clientId } = await createClient();
+    const insert = (id: string, ageS: number) =>
+      env.DB.prepare(
+        `INSERT INTO email_deliveries (id, request_id, client_id, template, provider, recipient, status, created_at)
+         VALUES (?, 'r', ?, 'welcome', 'gmail', 'old@example.com', 'submitted', unixepoch() - ?)`,
+      )
+        .bind(id, clientId, ageS)
+        .run();
+    await insert("msg_old", 31 * 24 * 3600);
+    await insert("msg_recent", 29 * 24 * 3600);
+    await purgeDeliveries(env.DB);
+    expect(await row("msg_old")).toBeNull();
+    expect(await row("msg_recent")).not.toBeNull();
   });
 });

@@ -21,7 +21,8 @@ export type SmtpErrorCode =
   | "smtp_timeout"
   | "smtp_temporary_failure"
   | "smtp_auth_failed"
-  | "smtp_rejected";
+  | "smtp_rejected"
+  | "smtp_unconfirmed";
 
 export class SmtpError extends Error {
   readonly code: SmtpErrorCode;
@@ -183,9 +184,14 @@ export async function sendMail(
     await conn.command(`MAIL FROM:<${msg.from}>`, [250]);
     await conn.command(`RCPT TO:<${msg.to}>`, [250, 251]);
     await conn.command("DATA", [354]);
-    // ponytail: a timeout waiting for this final 250 is retried as transient, so a lost reply can duplicate the email;
-    // inherent to SMTP without delivery tracking.
-    await conn.command(`${dotStuff(buildMessage(msg))}\r\n.`, [250]);
+    try {
+      await conn.command(`${dotStuff(buildMessage(msg))}\r\n.`, [250]);
+    } catch (e) {
+      // A 4xx/5xx reply means not accepted. No reply means the server may already have accepted the message, so it is
+      // not retried: a retry could deliver it twice.
+      if (e instanceof SmtpError && e.code !== "smtp_timeout" && e.code !== "smtp_connection_failed") throw e;
+      throw new SmtpError("smtp_unconfirmed", false, "No reply to the end of DATA");
+    }
     await conn.write("QUIT\r\n").catch(() => {});
   } catch (e) {
     if (e instanceof SmtpError) throw e;

@@ -30,7 +30,6 @@ Success: a backend calls `POST /v1/email/send` with an API key, and the email is
 - XOAUTH2
 - per-client SMTP accounts and encrypted credentials
 - Web Push
-- retention cron
 
 ## Approach
 
@@ -81,6 +80,8 @@ The skeleton files `src/templates/{welcome,verify-email,password-reset,login-ale
 |---|---|---|
 | `DB` | D1 binding | Database `notify-flow` |
 | `CLIENT_RATE_LIMITER` | Rate Limiting binding | `limit: 60`, `period: 60`, keyed by `client_id` |
+| `IP_RATE_LIMITER` | Rate Limiting binding | `limit: 300`, `period: 60`, keyed by `CF-Connecting-IP`, checked before the API key |
+| `triggers.crons` | Cron Trigger | `0 3 * * *`: deletes `email_deliveries` rows older than 30 days, 1000 per statement |
 | `SMTP_PROVIDER` | var | `gmail`, `microsoft` or `generic`. Selects the default host, port and security. |
 | `RECIPIENT_LIMIT_PER_HOUR` | var | Default `5` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` | var, optional (default `""`) | Override the preset. `SMTP_SECURITY` is `tls` or `starttls`. Vars, not secrets: a Worker cannot have a secret and a var with the same name. |

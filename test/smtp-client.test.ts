@@ -83,6 +83,16 @@ describe("sendMail", () => {
     await expect(sendMail(config, message, smtp.connect, 50)).rejects.toMatchObject({ code: "smtp_timeout", transient: true });
   });
 
+  it("does not mark a missing reply after DATA as transient", async () => {
+    const smtp = fakeSmtp({ ".": "SILENT" });
+    await expect(sendMail(config, message, smtp.connect, 50)).rejects.toMatchObject({ code: "smtp_unconfirmed", transient: false });
+  });
+
+  it("keeps a 4xx reply after DATA transient", async () => {
+    const smtp = fakeSmtp({ ".": "451 try later" });
+    await expect(sendMail(config, message, smtp.connect)).rejects.toMatchObject({ code: "smtp_temporary_failure", transient: true });
+  });
+
   it("never puts the SMTP reply text in the error message", async () => {
     const smtp = fakeSmtp({ RCPT: "550 user@example.com does not exist" });
     await expect(sendMail(config, message, smtp.connect)).rejects.toThrow(/^SMTP 550$/);

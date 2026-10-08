@@ -10,12 +10,22 @@ export function invalid(message: string): never {
   throw new HttpError(400, "validation_error", message);
 }
 
+/** Reads the body, stopping as soon as it exceeds MAX_BODY_BYTES instead of buffering all of it first. */
 export async function readJson(req: Request): Promise<Record<string, unknown>> {
-  const buffer = await req.arrayBuffer();
-  if (buffer.byteLength > MAX_BODY_BYTES) throw new HttpError(413, "payload_too_large", "Body exceeds 256 KB");
+  const tooLarge = () => new HttpError(413, "payload_too_large", "Body exceeds 256 KB");
+  if (Number(req.headers.get("Content-Length")) > MAX_BODY_BYTES) throw tooLarge();
+  const decoder = new TextDecoder();
+  let raw = "";
+  let size = 0;
+  for await (const chunk of req.body ?? []) {
+    size += chunk.byteLength;
+    if (size > MAX_BODY_BYTES) throw tooLarge(); // leaving the loop cancels the stream
+    raw += decoder.decode(chunk, { stream: true });
+  }
+  raw += decoder.decode();
   let body: unknown;
   try {
-    body = JSON.parse(new TextDecoder().decode(buffer));
+    body = JSON.parse(raw);
   } catch {
     throw new HttpError(400, "invalid_json", "Body is not valid JSON");
   }

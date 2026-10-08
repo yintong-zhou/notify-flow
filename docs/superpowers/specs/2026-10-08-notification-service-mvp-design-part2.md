@@ -63,7 +63,7 @@ Other codes:
 
 ### Send flow
 
-1. Authenticate the key to get the `client_id`.
+1. Check the IP rate limit (`IP_RATE_LIMITER.limit({ key: CF-Connecting-IP })`), or return `429`, so invalid keys cannot reach D1 unthrottled. Then authenticate the key (at most 128 characters) to get the `client_id`.
 2. Check the client rate limit (`CLIENT_RATE_LIMITER.limit({ key: client_id })`), or return `429`. This check applies to every `/v1/*` route, not only to sends.
 3. Validate the payload:
    - `to` is a single address of at most 254 characters, with no CR, LF or comma, matching `^[^\s@]+@[^\s@]+\.[^\s@]+$`;
@@ -71,13 +71,14 @@ Other codes:
    - `locale` is supported;
    - `variables` is an object of strings.
 4. Resolve the template and check that the variables match.
-5. Check the recipient rate limit. An idempotent replay (a known `Idempotency-Key`) is answered with the original `{id, status}` before this step, so it is never rate limited:
+5. An idempotent replay (a known `Idempotency-Key`) is answered with the original `{id, status}` here, so it is never rate limited.
+6. `INSERT` the delivery row with status `processing`, only if the recipient limit allows it. The count and the insert are one statement, so concurrent requests cannot exceed the limit:
    ```sql
-   SELECT COUNT(*) FROM email_deliveries
-   WHERE client_id = ? AND recipient = ? AND template = ? AND status != 'failed' AND created_at > unixepoch() - 3600
+   INSERT INTO email_deliveries (...) SELECT ... WHERE (SELECT COUNT(*) FROM email_deliveries
+     WHERE client_id = ? AND recipient = ? AND template = ? AND status != 'failed' AND created_at > unixepoch() - 3600) < ?
+   ON CONFLICT (client_id, idempotency_key) DO NOTHING
    ```
-   Return `429` if the count is at least `RECIPIENT_LIMIT_PER_HOUR`.
-6. `INSERT` the delivery row with status `processing`. If the `UNIQUE (client_id, idempotency_key)` constraint fails, return the existing row's `{id, status}` with `200` and send nothing. This holds even when the existing status is `failed`: the client retries with a new key.
+   If no row was inserted and the `UNIQUE (client_id, idempotency_key)` constraint was hit, return the existing row's `{id, status}` with `200` and send nothing. Otherwise the limit is reached: return `429`. This holds even when the existing status is `failed`: the client retries with a new key.
 7. Render the template and send through SMTP with retries.
 8. `UPDATE` the row to `submitted` (setting `sent_at` and `attempts`), or to `failed` (setting `error_code` and `attempts`). Steps 6-8 run under `ctx.waitUntil`, so they finish even if the caller disconnects. If a row is still `processing` more than 300 s after creation, a replay closes it as `failed` with `error_code = 'abandoned'`. The email may or may not have gone out.
 
@@ -123,6 +124,7 @@ It contains a `text/plain` part and a `text/html` part, both `charset=UTF-8` wit
 | `4xx` reply | `smtp_temporary_failure` | yes |
 | `5xx` reply to `AUTH` | `smtp_auth_failed` | no |
 | Any other `5xx` reply | `smtp_rejected` | no |
+| No reply after the final `.` of `DATA` (timeout or closed socket) | `smtp_unconfirmed` | no: the server may have accepted it, and a retry could send it twice |
 
 **Retry** happens in `email-service`: at most 3 attempts, only for transient errors, with backoff delays of 500 ms and then 1000 ms.
 

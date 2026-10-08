@@ -14,7 +14,7 @@ export interface FakeSmtp {
 
 /**
  * A scripted SMTP server. `overrides` maps a command verb (e.g. "RCPT", "AUTH") to the reply line to send instead
- * of the happy-path reply. The special value "SILENT" sends no reply.
+ * of the happy-path reply ("." for the end of DATA). The special value "SILENT" sends no reply.
  */
 export function fakeSmtp(overrides: Record<string, string> = {}): FakeSmtp {
   const encoder = new TextEncoder();
@@ -79,7 +79,8 @@ export function fakeSmtp(overrides: Record<string, string> = {}): FakeSmtp {
           if (inData) {
             if (line === ".") {
               inData = false;
-              push("250 queued");
+              const answer = overrides["."] ?? "250 queued";
+              if (answer !== "SILENT") push(answer);
             } else {
               state.data += `${line}\r\n`;
             }

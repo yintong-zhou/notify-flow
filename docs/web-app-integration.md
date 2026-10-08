@@ -110,7 +110,7 @@ curl -X POST "$NOTIFY_FLOW_URL/v1/email/send" \
 | 413 | `payload_too_large` | The body is over 256 KB |
 | 429 | `rate_limited` | Too many requests: retry later |
 | 500 | `smtp_misconfigured`, `internal_error` | A problem on the service side: tell the administrator |
-| 502 | `smtp_failed` | The SMTP server refused the message after retries. The response includes the delivery `id` |
+| 502 | `smtp_failed` | The SMTP server refused the message after retries, or never confirmed it (the message then says it may still be delivered). The response includes the delivery `id` |
 
 Errors always have the shape `{"error":{"code":"…","message":"…"}}`.
 

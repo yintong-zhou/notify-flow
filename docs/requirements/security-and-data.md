@@ -184,5 +184,5 @@ WHERE recipient = ? AND template = ? AND created_at > unixepoch() - 3600;
 Notes:
 
 - **Write budget.** D1 has a single primary that accepts writes, and plans cap the rows written per day. A send costs about 2 writes (the insert, then the status update), which is fine for transactional volume. Check the current D1 limits before sizing.
-- **Retention.** Old `email_deliveries` rows should eventually be purged by a Cron Trigger. Add it when volume requires it.
+- **Retention.** A daily Cron Trigger deletes `email_deliveries` rows older than 30 days, in batches.
 - **No sensitive data.** The table never stores variables, rendered bodies, reset URLs or tokens.

@@ -2,7 +2,8 @@ import { sendEmail } from "./routes/email";
 import { health } from "./routes/health";
 import { deleteTemplate, getTemplate, listTemplates, putTemplate } from "./routes/templates";
 import { authenticate } from "./security/auth";
-import { checkClientLimit } from "./security/rate-limit";
+import { checkClientLimit, checkIpLimit } from "./security/rate-limit";
+import { purgeDeliveries } from "./services/email-service";
 import { sendMail, type SendMailFn } from "./smtp/smtp-client";
 import { HttpError } from "./types";
 
@@ -22,6 +23,7 @@ export async function handle(
     }
     if (!pathname.startsWith("/v1/")) throw new HttpError(404, "not_found", "Route not found");
 
+    await checkIpLimit(env, req);
     const clientId = await authenticate(req, env);
     await checkClientLimit(env, clientId);
 
@@ -57,8 +59,12 @@ function errorResponse(e: unknown): Response {
   if (e instanceof HttpError) {
     return Response.json({ error: { code: e.code, message: e.message }, ...e.extra }, { status: e.status });
   }
-  console.error(JSON.stringify({ error_code: "internal_error", message: e instanceof Error ? e.message : String(e) }));
+  // No e.message: an unexpected error could carry request data, and logs must never hold it.
+  console.error(JSON.stringify({ error_code: "internal_error" }));
   return Response.json({ error: { code: "internal_error", message: "Internal error" } }, { status: 500 });
 }
 
-export default { fetch: (req, env, ctx) => handle(req, env, sendMail, ctx) } satisfies ExportedHandler<Env>;
+export default {
+  fetch: (req, env, ctx) => handle(req, env, sendMail, ctx),
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(purgeDeliveries(env.DB)),
+} satisfies ExportedHandler<Env>;

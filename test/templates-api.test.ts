@@ -1,4 +1,6 @@
+import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { handle } from "../src/index";
 import { call, createClient } from "./helpers";
 
 const custom = { subject: "Hi {{name}}", html: "<p>Hi {{name}}</p>", text: "Hi {{name}}", variables: ["name"] };
@@ -86,6 +88,18 @@ describe("template validation", () => {
     expect((await bad.json<any>()).error.code).toBe("invalid_json");
     const big = await call("/v1/templates/x/en", { key, method: "PUT", rawBody: "a".repeat(256 * 1024 + 1) });
     expect(big.status).toBe(413);
+  });
+
+  it("stops reading an endless body without Content-Length", async () => {
+    const { key } = await createClient();
+    const chunk = new Uint8Array(64 * 1024).fill(97);
+    const endless = new ReadableStream<Uint8Array>({ pull: (c) => c.enqueue(chunk) });
+    const req = new Request("https://notify.test/v1/templates/x/en", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${key}` },
+      body: endless,
+    });
+    expect((await handle(req, env)).status).toBe(413);
   });
 
   it("returns 405 for unsupported methods", async () => {

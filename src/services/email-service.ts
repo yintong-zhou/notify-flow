@@ -1,4 +1,3 @@
-import { checkRecipientLimit } from "../security/rate-limit";
 import type { SendRequest } from "../security/validation";
 import { resolveSmtpConfig } from "../smtp/provider";
 import { SmtpError, type SendMailFn } from "../smtp/smtp-client";
@@ -37,6 +36,23 @@ async function findByIdempotencyKey(db: D1Database, clientId: string, key: strin
   return { id: row.id, status: row.status };
 }
 
+// Well past the 1-hour recipient window; an Idempotency-Key older than this is forgotten.
+const RETENTION_S = 30 * 24 * 3600;
+const PURGE_BATCH = 1000;
+
+/** Deletes delivery rows older than RETENTION_S, in batches so one statement never holds the write lock for long. */
+export async function purgeDeliveries(db: D1Database): Promise<void> {
+  for (;;) {
+    const { meta } = await db
+      .prepare(
+        "DELETE FROM email_deliveries WHERE id IN (SELECT id FROM email_deliveries WHERE created_at < unixepoch() - ? LIMIT ?)",
+      )
+      .bind(RETENTION_S, PURGE_BATCH)
+      .run();
+    if (meta.changes < PURGE_BATCH) return;
+  }
+}
+
 export async function sendTemplatedEmail(
   env: Env,
   clientId: string,
@@ -53,19 +69,33 @@ export async function sendTemplatedEmail(
     const existing = await findByIdempotencyKey(env.DB, clientId, options.idempotencyKey);
     if (existing) return existing;
   }
-  await checkRecipientLimit(env, clientId, request.to, request.template);
-
+  // Count and insert in one statement, so a concurrent burst cannot exceed the limit. Per client (no cross-tenant
+  // lockout), and failed sends don't count (an SMTP outage must not lock users out).
   const id = `msg_${crypto.randomUUID()}`;
   const { meta } = await env.DB.prepare(
     `INSERT INTO email_deliveries (id, request_id, client_id, idempotency_key, template, provider, recipient, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'processing', unixepoch())
+     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, 'processing', unixepoch()
+     WHERE (SELECT COUNT(*) FROM email_deliveries
+            WHERE client_id = ?3 AND recipient = ?7 AND template = ?5 AND status != 'failed' AND created_at > unixepoch() - 3600) < ?8
      ON CONFLICT (client_id, idempotency_key) DO NOTHING`,
   )
-    .bind(id, options.requestId, clientId, options.idempotencyKey, request.template, config.provider, request.to)
+    .bind(
+      id,
+      options.requestId,
+      clientId,
+      options.idempotencyKey,
+      request.template,
+      config.provider,
+      request.to,
+      Number(env.RECIPIENT_LIMIT_PER_HOUR) || 5,
+    )
     .run();
   if (meta.changes === 0) {
-    // A concurrent request with the same Idempotency-Key won the insert (NULL keys never conflict).
-    return (await findByIdempotencyKey(env.DB, clientId, options.idempotencyKey!))!;
+    // Either a concurrent request with the same Idempotency-Key won the insert (NULL keys never conflict), or the
+    // recipient limit is reached.
+    const existing = options.idempotencyKey === null ? null : await findByIdempotencyKey(env.DB, clientId, options.idempotencyKey);
+    if (existing) return existing;
+    throw new HttpError(429, "rate_limited", "Too many emails for this recipient and template");
   }
 
   const message = {
@@ -95,7 +125,11 @@ export async function sendTemplatedEmail(
         .run();
       console.error(JSON.stringify({ id, client_id: clientId, error_code: errorCode }));
       if (!smtp) throw e;
-      throw new HttpError(502, "smtp_failed", "The SMTP server did not accept the message", { id });
+      const message =
+        smtp.code === "smtp_unconfirmed"
+          ? "The SMTP server did not confirm the message: it may still be delivered"
+          : "The SMTP server did not accept the message";
+      throw new HttpError(502, "smtp_failed", message, { id });
     }
   }
 }

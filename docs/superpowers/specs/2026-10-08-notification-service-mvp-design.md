@@ -40,7 +40,7 @@ The service has no runtime dependencies:
 - **SMTP client:** written from scratch on `cloudflare:sockets`.
 - **Templates:** `{{var}}` substitution.
 
-The only dependencies are for development: `wrangler`, `typescript`, `vitest` and `@cloudflare/vitest-pool-workers`.
+The only dependencies are for development: `wrangler`, `typescript`, `vitest` and `@cloudflare/vitest-plugin` (formerly `@cloudflare/vitest-pool-workers`).
 
 ## Architecture
 
@@ -83,10 +83,10 @@ The skeleton files `src/templates/{welcome,verify-email,password-reset,login-ale
 | `CLIENT_RATE_LIMITER` | Rate Limiting binding | `limit: 60`, `period: 60`, keyed by `client_id` |
 | `SMTP_PROVIDER` | var | `gmail`, `microsoft` or `generic`. Selects the default host, port and security. |
 | `RECIPIENT_LIMIT_PER_HOUR` | var | Default `5` |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` | secret or var, optional | Override the preset. `SMTP_SECURITY` is `tls` or `starttls`. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` | var, optional (default `""`) | Override the preset. `SMTP_SECURITY` is `tls` or `starttls`. Vars, not secrets: a Worker cannot have a secret and a var with the same name. |
 | `SMTP_AUTH_TYPE` | var | `plain` or `login` |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | secret | |
-| `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` | secret or var | |
+| `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` | secret | |
 
 Presets:
 
@@ -204,14 +204,14 @@ Other codes:
 ### Send flow
 
 1. Authenticate the key to get the `client_id`.
-2. Check the client rate limit (`CLIENT_RATE_LIMITER.limit({ key: client_id })`), or return `429`.
+2. Check the client rate limit (`CLIENT_RATE_LIMITER.limit({ key: client_id })`), or return `429`. This check applies to every `/v1/*` route, not only to sends.
 3. Validate the payload:
    - `to` is a single address of at most 254 characters, with no CR, LF or comma, matching `^[^\s@]+@[^\s@]+\.[^\s@]+$`;
    - `template` follows the name rule;
    - `locale` is supported;
    - `variables` is an object of strings.
 4. Resolve the template and check that the variables match.
-5. Check the recipient rate limit:
+5. Check the recipient rate limit. An idempotent replay (a known `Idempotency-Key`) is answered with the original `{id, status}` before this step, so it is never rate limited:
    ```sql
    SELECT COUNT(*) FROM email_deliveries
    WHERE recipient = ? AND template = ? AND created_at > unixepoch() - 3600
@@ -280,7 +280,7 @@ The key is never stored in plaintext.
 
 ## Testing
 
-`vitest` with `@cloudflare/vitest-pool-workers`, running inside `workerd` with a local D1 and the migrations applied in test setup.
+`vitest` with `@cloudflare/vitest-plugin`, running inside `workerd` with a local D1 and the migrations applied in test setup.
 
 - **`test/renderer.test.ts`:** escaping, CRLF stripping, no re-expansion, variable mismatch, and the resolution order (client → built-in → `en`).
 - **`test/smtp-client.test.ts`:** a scripted fake server built on stream pairs and passed as `connectFn`. It covers:

@@ -439,6 +439,64 @@ Passwords, sensitive tokens, SMTP credentials, and plain-text reset tokens must 
 
 ---
 
+## Storage (Cloudflare D1)
+
+Persistent data lives in **Cloudflare D1** (SQLite). The schema is versioned with `wrangler d1 migrations`, without an ORM.
+
+| Need | Where | How |
+|---|---|---|
+| Delivery log | D1 `email_deliveries` | One row per send request |
+| Client API keys | D1 `clients` | SHA-256 hash of the key via `crypto.subtle`. Keys are random and high-entropy, so bcrypt is not needed. |
+| Idempotency | D1 `email_deliveries` | `UNIQUE(client_id, idempotency_key)`: a duplicate `INSERT` fails atomically, so the database does the deduplication |
+| Per-recipient limit (e.g. 5 password-reset / email / hour) | D1 `email_deliveries` | `COUNT(*)` over the last hour, with no separate counter table |
+| Per-client limit (e.g. 100 requests / minute) | Workers Rate Limiting binding | Supports 10 s or 60 s periods only and its counts are approximate, which is enough here. It avoids a D1 write per request just to count. |
+| Encrypted SMTP credentials (post-MVP) | D1 | Encrypted per row, with the master key in Cloudflare Secrets |
+
+KV is not used for idempotency: it is eventually consistent and would let duplicates through.
+
+```sql
+CREATE TABLE clients (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  key_hash   TEXT NOT NULL UNIQUE,   -- hex SHA-256 of the API key
+  created_at INTEGER NOT NULL        -- unix seconds
+);
+
+CREATE TABLE email_deliveries (
+  id              TEXT PRIMARY KEY,  -- msg_...
+  request_id      TEXT NOT NULL,
+  client_id       TEXT NOT NULL REFERENCES clients(id),
+  idempotency_key TEXT,              -- NULL when the header is absent
+  template        TEXT NOT NULL,
+  provider        TEXT NOT NULL,
+  recipient       TEXT NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN
+                    ('accepted','queued','processing','submitted','failed','retrying')),
+  attempts        INTEGER NOT NULL DEFAULT 0,
+  error_code      TEXT,
+  created_at      INTEGER NOT NULL,  -- unix seconds
+  sent_at         INTEGER,
+  UNIQUE (client_id, idempotency_key)
+);
+
+CREATE INDEX idx_deliveries_rate ON email_deliveries (recipient, template, created_at);
+```
+
+Per-recipient rate limit check:
+
+```sql
+SELECT COUNT(*) FROM email_deliveries
+WHERE recipient = ? AND template = ? AND created_at > unixepoch() - 3600;
+```
+
+Notes:
+
+- **Write budget.** D1 has a single primary that accepts writes, and plans cap the rows written per day. A send costs about 2 writes (the insert, then the status update), which is fine for transactional volume. Check the current D1 limits before sizing.
+- **Retention.** Old `email_deliveries` rows should eventually be purged by a Cron Trigger. Add it when volume requires it.
+- **No sensitive data.** The table never stores variables, rendered bodies, reset URLs or tokens.
+
+---
+
 ## Statuses
 
 The recommended statuses are:

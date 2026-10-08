@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { handle } from "../src/index";
 import { SmtpError } from "../src/smtp/smtp-client";
 import { call, createClient, insertTemplate, recorder } from "./helpers";
 
@@ -111,6 +112,54 @@ describe("POST /v1/email/send", () => {
     expect(replay.status).toBe(200);
     expect(await replay.json()).toEqual(first);
     expect(rec.messages).toHaveLength(5);
+  });
+
+  it("keeps the recipient limit separate for each client", async () => {
+    const a = await createClient("a");
+    const b = await createClient("b");
+    const to = `shared-${crypto.randomUUID()}@example.com`;
+    for (let i = 0; i < 5; i++) expect((await send(a.key, welcome(to))).status).toBe(200);
+    expect((await send(a.key, welcome(to))).status).toBe(429);
+    expect((await send(b.key, welcome(to))).status).toBe(200);
+  });
+
+  it("does not count failed sends against the recipient limit", async () => {
+    const { key } = await createClient();
+    const to = `outage-${crypto.randomUUID()}@example.com`;
+    for (let i = 0; i < 5; i++) {
+      const rec = recorder(new SmtpError("smtp_rejected", false, "SMTP 554"));
+      expect((await send(key, welcome(to), rec.send)).status).toBe(502);
+    }
+    expect((await send(key, welcome(to))).status).toBe(200);
+  });
+
+  it("keeps the send alive with ctx.waitUntil", async () => {
+    const { key } = await createClient();
+    const pending: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p) } as unknown as ExecutionContext;
+    const req = new Request("https://notify.test/v1/email/send", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}` },
+      body: JSON.stringify(welcome(`w-${crypto.randomUUID()}@example.com`)),
+    });
+    expect((await handle(req, env, recorder().send, ctx)).status).toBe(200);
+    expect(pending).toHaveLength(1);
+  });
+
+  it("reports an abandoned processing row as failed on replay", async () => {
+    const { id: clientId, key } = await createClient();
+    const to = `stale-${crypto.randomUUID()}@example.com`;
+    await env.DB.prepare(
+      `INSERT INTO email_deliveries (id, request_id, client_id, idempotency_key, template, provider, recipient, status, created_at)
+       VALUES ('msg_stale', 'r', ?, 'stale-key', 'welcome', 'gmail', ?, 'processing', unixepoch() - 600)`,
+    )
+      .bind(clientId, to)
+      .run();
+    const rec = recorder();
+    const replay = await send(key, welcome(to), rec.send, { "Idempotency-Key": "stale-key" });
+    expect(await replay.json()).toEqual({ id: "msg_stale", status: "failed" });
+    expect(await row("msg_stale")).toMatchObject({ status: "failed", error_code: "abandoned" });
+    expect(rec.messages).toHaveLength(0);
   });
 
   it("retries a transient SMTP failure", async () => {

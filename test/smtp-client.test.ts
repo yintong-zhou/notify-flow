@@ -135,6 +135,13 @@ describe("resolveSmtpConfig", () => {
     });
   });
 
+  it("defaults the auth type per preset (Microsoft 365 only offers AUTH LOGIN)", () => {
+    const noAuth = { ...env, SMTP_AUTH_TYPE: "" };
+    expect(resolveSmtpConfig({ ...noAuth, SMTP_PROVIDER: "microsoft" }).authType).toBe("login");
+    expect(resolveSmtpConfig(noAuth).authType).toBe("plain");
+    expect(resolveSmtpConfig({ ...env, SMTP_PROVIDER: "microsoft", SMTP_AUTH_TYPE: "plain" }).authType).toBe("plain");
+  });
+
   it("lets vars override the preset", () => {
     expect(resolveSmtpConfig({ ...env, SMTP_PORT: "587", SMTP_SECURITY: "starttls" })).toMatchObject({
       host: "smtp.gmail.com",

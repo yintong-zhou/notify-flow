@@ -37,7 +37,7 @@ Request flow: `index.ts` (router) → `security/` (auth, client rate limit, vali
 - **Auth:** each client gets its own API key, sent as `Authorization: Bearer` or `X-API-Key`. Keys are stored only as hex SHA-256 in `clients.key_hash`.
 - **Configuration:** `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` and `SMTP_FROM_NAME` are secrets. `SMTP_PROVIDER`, `SMTP_AUTH_TYPE`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` and `RECIPIENT_LIMIT_PER_HOUR` are `vars` in `wrangler.jsonc`. A Worker can't have a secret and a var with the same name.
 - **Idempotency:** honor the `Idempotency-Key` header, and never send the same message twice. A replay is answered before the recipient limit.
-- **Rate limiting:** 60 requests per 60 s per client (Rate Limiting binding, every `/v1/*` route), and `RECIPIENT_LIMIT_PER_HOUR` per recipient and template (D1 count).
+- **Rate limiting:** 60 requests per 60 s per client (Rate Limiting binding, every `/v1/*` route), and `RECIPIENT_LIMIT_PER_HOUR` per client, recipient and template (D1 count; failed sends excluded).
 - **Logs and delivery records** (`email_deliveries`) must never contain variables, rendered content, tokens, reset URLs or credentials. `console.error` logs only `{id, client_id, error_code}`.
 - **Statuses:** `accepted`, `queued`, `processing`, `submitted`, `failed`, `retrying`. Use `submitted` and never `delivered`, because SMTP acceptance does not prove inbox delivery.
 

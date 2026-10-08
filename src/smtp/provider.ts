@@ -15,10 +15,11 @@ export interface SmtpConfig {
   fromName: string;
 }
 
-const PRESETS: Record<string, { host: string; port: number; security: Security }> = {
-  gmail: { host: "smtp.gmail.com", port: 465, security: "tls" },
-  microsoft: { host: "smtp.office365.com", port: 587, security: "starttls" },
-  generic: { host: "", port: 587, security: "starttls" },
+const PRESETS: Record<string, { host: string; port: number; security: Security; authType: AuthType }> = {
+  gmail: { host: "smtp.gmail.com", port: 465, security: "tls", authType: "plain" },
+  // Microsoft 365 advertises only AUTH LOGIN and XOAUTH2.
+  microsoft: { host: "smtp.office365.com", port: 587, security: "starttls", authType: "login" },
+  generic: { host: "", port: 587, security: "starttls", authType: "plain" },
 };
 
 export function resolveSmtpConfig(env: Env): SmtpConfig {
@@ -27,7 +28,7 @@ export function resolveSmtpConfig(env: Env): SmtpConfig {
   const host = env.SMTP_HOST || preset?.host;
   const port = Number(env.SMTP_PORT || preset?.port);
   const security = env.SMTP_SECURITY || preset?.security;
-  const authType = env.SMTP_AUTH_TYPE;
+  const authType = env.SMTP_AUTH_TYPE || preset?.authType;
   if (
     !preset ||
     !host ||

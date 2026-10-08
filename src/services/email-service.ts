@@ -14,11 +14,27 @@ export interface SendResult {
   status: DeliveryStatus;
 }
 
-function findByIdempotencyKey(db: D1Database, clientId: string, key: string): Promise<SendResult | null> {
-  return db
-    .prepare("SELECT id, status FROM email_deliveries WHERE client_id = ? AND idempotency_key = ?")
-    .bind(clientId, key)
-    .first<SendResult>();
+// Longer than the worst-case send (3 attempts x per-command timeouts + backoff), so only truly abandoned rows match.
+const ABANDONED_AFTER_S = 300;
+
+/** The stored result for an idempotency key; a `processing` row older than ABANDONED_AFTER_S is closed as failed. */
+async function findByIdempotencyKey(db: D1Database, clientId: string, key: string): Promise<SendResult | null> {
+  const row = await db
+    .prepare(
+      "SELECT id, status, created_at < unixepoch() - ? AS abandoned FROM email_deliveries WHERE client_id = ? AND idempotency_key = ?",
+    )
+    .bind(ABANDONED_AFTER_S, clientId, key)
+    .first<SendResult & { abandoned: number }>();
+  if (!row) return null;
+  if (row.status === "processing" && row.abandoned) {
+    // The request died mid-send (e.g. the runtime was cancelled). The email may or may not have gone out.
+    await db
+      .prepare("UPDATE email_deliveries SET status = 'failed', error_code = 'abandoned' WHERE id = ? AND status = 'processing'")
+      .bind(row.id)
+      .run();
+    return { id: row.id, status: "failed" };
+  }
+  return { id: row.id, status: row.status };
 }
 
 export async function sendTemplatedEmail(
@@ -37,7 +53,7 @@ export async function sendTemplatedEmail(
     const existing = await findByIdempotencyKey(env.DB, clientId, options.idempotencyKey);
     if (existing) return existing;
   }
-  await checkRecipientLimit(env, request.to, request.template);
+  await checkRecipientLimit(env, clientId, request.to, request.template);
 
   const id = `msg_${crypto.randomUUID()}`;
   const { meta } = await env.DB.prepare(

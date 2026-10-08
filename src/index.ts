@@ -8,7 +8,12 @@ import { HttpError } from "./types";
 
 const TEMPLATE_PATH = /^\/v1\/templates\/([^/]+)\/([^/]+)$/;
 
-export async function handle(req: Request, env: Env, send: SendMailFn = sendMail): Promise<Response> {
+export async function handle(
+  req: Request,
+  env: Env,
+  send: SendMailFn = sendMail,
+  ctx?: ExecutionContext,
+): Promise<Response> {
   try {
     const { pathname } = new URL(req.url);
     if (pathname === "/health") {
@@ -22,7 +27,7 @@ export async function handle(req: Request, env: Env, send: SendMailFn = sendMail
 
     if (pathname === "/v1/email/send") {
       allow(req, "POST");
-      return await sendEmail(req, env, clientId, send);
+      return await sendEmail(req, env, clientId, send, ctx);
     }
     if (pathname === "/v1/templates") {
       allow(req, "GET");
@@ -56,4 +61,4 @@ function errorResponse(e: unknown): Response {
   return Response.json({ error: { code: "internal_error", message: "Internal error" } }, { status: 500 });
 }
 
-export default { fetch: (req, env) => handle(req, env) } satisfies ExportedHandler<Env>;
+export default { fetch: (req, env, ctx) => handle(req, env, sendMail, ctx) } satisfies ExportedHandler<Env>;

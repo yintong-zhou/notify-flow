@@ -119,21 +119,24 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 |---|---|---|
 | `SMTP_PROVIDER` | `vars` in `wrangler.jsonc` | `gmail`, `microsoft` or `generic` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` | `vars`, optional | Override the preset (`SMTP_SECURITY` is `tls` or `starttls`) |
-| `SMTP_AUTH_TYPE` | `vars` | `plain` or `login` |
+| `SMTP_AUTH_TYPE` | `vars`, optional | `plain` or `login` (default: per preset) |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | secret | SMTP account credentials |
 | `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` | secret | Sender identity |
 
-| Preset | Host | Port and security |
+| Preset | Host | Port, security and auth |
 |---|---|---|
-| `gmail` | `smtp.gmail.com` | `465` with TLS |
-| `microsoft` | `smtp.office365.com` | `587` with STARTTLS |
-| `generic` | set `SMTP_HOST` | `587` with STARTTLS |
+| `gmail` | `smtp.gmail.com` | `465` with TLS, AUTH PLAIN |
+| `microsoft` | `smtp.office365.com` | `587` with STARTTLS, AUTH LOGIN |
+| `generic` | set `SMTP_HOST` | `587` with STARTTLS, AUTH PLAIN |
+
+> [!WARNING]
+> Microsoft 365 requires SMTP AUTH to be enabled on the sending mailbox, and Security Defaults block it. Microsoft is also retiring basic authentication for SMTP AUTH. If you use this preset, plan for OAuth2 (XOAUTH2 is on the roadmap).
 
 ## Security
 
 - **Per-client API keys**, stored only as SHA-256 hashes.
 - **Idempotency:** retrying a request with the same `Idempotency-Key` never sends a duplicate email.
-- **Rate limits:** 60 requests per minute per client, and `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template.
+- **Rate limits:** 60 requests per minute per client, and `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template for each client. Failed sends do not count.
 - **No secrets in logs:** delivery records and logs never contain variables, tokens, reset URLs or SMTP credentials.
 
 ## Project structure

@@ -84,17 +84,17 @@ The skeleton files `src/templates/{welcome,verify-email,password-reset,login-ale
 | `SMTP_PROVIDER` | var | `gmail`, `microsoft` or `generic`. Selects the default host, port and security. |
 | `RECIPIENT_LIMIT_PER_HOUR` | var | Default `5` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` | var, optional (default `""`) | Override the preset. `SMTP_SECURITY` is `tls` or `starttls`. Vars, not secrets: a Worker cannot have a secret and a var with the same name. |
-| `SMTP_AUTH_TYPE` | var | `plain` or `login` |
+| `SMTP_AUTH_TYPE` | var, optional | `plain` or `login`. Defaults to the preset (`gmail` and `generic` use `plain`, `microsoft` uses `login`, since Microsoft 365 only offers AUTH LOGIN and XOAUTH2). |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | secret | |
 | `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` | secret | |
 
 Presets:
 
-| Preset | Host | Port | Security |
-|---|---|---|---|
-| `gmail` | `smtp.gmail.com` | 465 | `tls` |
-| `microsoft` | `smtp.office365.com` | 587 | `starttls` |
-| `generic` | — | 587 | `starttls` |
+| Preset | Host | Port | Security | Auth |
+|---|---|---|---|---|
+| `gmail` | `smtp.gmail.com` | 465 | `tls` | `plain` |
+| `microsoft` | `smtp.office365.com` | 587 | `starttls` | `login` |
+| `generic` | — | 587 | `starttls` | `plain` |
 
 The `generic` preset requires `SMTP_HOST`. If no host can be resolved, or the port is 25 (blocked on Workers), the send fails with `500 smtp_misconfigured`.
 
@@ -137,7 +137,7 @@ CREATE TABLE email_deliveries (
   UNIQUE (client_id, idempotency_key)
 );
 
-CREATE INDEX idx_deliveries_rate ON email_deliveries (recipient, template, created_at);
+CREATE INDEX idx_deliveries_rate ON email_deliveries (client_id, recipient, template, created_at);  -- migration 0002
 ```
 
 `email_deliveries` never stores variables, rendered content, URLs or tokens.
@@ -214,12 +214,12 @@ Other codes:
 5. Check the recipient rate limit. An idempotent replay (a known `Idempotency-Key`) is answered with the original `{id, status}` before this step, so it is never rate limited:
    ```sql
    SELECT COUNT(*) FROM email_deliveries
-   WHERE recipient = ? AND template = ? AND created_at > unixepoch() - 3600
+   WHERE client_id = ? AND recipient = ? AND template = ? AND status != 'failed' AND created_at > unixepoch() - 3600
    ```
    Return `429` if the count is at least `RECIPIENT_LIMIT_PER_HOUR`.
 6. `INSERT` the delivery row with status `processing`. If the `UNIQUE (client_id, idempotency_key)` constraint fails, return the existing row's `{id, status}` with `200` and send nothing. This holds even when the existing status is `failed`: the client retries with a new key.
 7. Render the template and send through SMTP with retries.
-8. `UPDATE` the row to `submitted` (setting `sent_at` and `attempts`), or to `failed` (setting `error_code` and `attempts`).
+8. `UPDATE` the row to `submitted` (setting `sent_at` and `attempts`), or to `failed` (setting `error_code` and `attempts`). Steps 6-8 run under `ctx.waitUntil`, so they finish even if the caller disconnects. If a row is still `processing` more than 300 s after creation, a replay closes it as `failed` with `error_code = 'abandoned'`. The email may or may not have gone out.
 
 ## SMTP client
 

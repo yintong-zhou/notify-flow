@@ -6,7 +6,7 @@ A self-hosted transactional email service for Cloudflare Workers. Your backends 
 > The MVP is implemented: emails are sent synchronously, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
 
 > [!TIP]
-> Adding email to your web app? Follow the **[web app integration guide](docs/web-app-integration.md)**: a step-by-step walkthrough with backend code samples.
+> Adding email to your web app? Follow the **[web app integration guide](docs/web-app-integration.md)**: a step-by-step walkthrough with backend code samples. Or paste the **[AI integration prompt](docs/ai-integration-prompt.md)** into a coding agent and let it do the work.
 
 ## Why
 

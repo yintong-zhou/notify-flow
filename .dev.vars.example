@@ -1,0 +1,4 @@
+SMTP_USERNAME=you@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=you@gmail.com
+SMTP_FROM_NAME=Notify Flow

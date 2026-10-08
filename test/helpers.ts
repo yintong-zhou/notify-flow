@@ -1,4 +1,6 @@
 import { env } from "cloudflare:workers";
+import { handle } from "../src/index";
+import type { MailMessage, SendMailFn } from "../src/smtp/smtp-client";
 import type { Locale, Template } from "../src/types";
 
 export async function createClient(name = "test-app"): Promise<{ id: string; key: string }> {
@@ -19,4 +21,32 @@ export async function insertTemplate(clientId: string, name: string, locale: Loc
   )
     .bind(clientId, name, locale, t.subject, t.html, t.text, JSON.stringify(t.variables))
     .run();
+}
+
+export interface CallInit {
+  key?: string;
+  method?: string;
+  body?: unknown;
+  rawBody?: string;
+  headers?: Record<string, string>;
+}
+
+export function call(path: string, init: CallInit = {}, send: SendMailFn = async () => {}, testEnv: Env = env): Promise<Response> {
+  const headers: Record<string, string> = { ...init.headers };
+  if (init.key) headers.Authorization = `Bearer ${init.key}`;
+  const body = init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body));
+  return handle(new Request(`https://notify.test${path}`, { method: init.method ?? "GET", headers, body }), testEnv, send);
+}
+
+/** A SendMailFn that records every attempt and throws the queued failures in order (falsy = succeed). */
+export function recorder(...failures: unknown[]): { send: SendMailFn; messages: MailMessage[] } {
+  const messages: MailMessage[] = [];
+  return {
+    messages,
+    send: async (_config, message) => {
+      messages.push(message);
+      const failure = failures.shift();
+      if (failure) throw failure;
+    },
+  };
 }

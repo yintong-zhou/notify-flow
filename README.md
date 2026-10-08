@@ -5,6 +5,9 @@ A self-hosted transactional email service for Cloudflare Workers. Your backends 
 > [!NOTE]
 > The MVP is implemented: emails are sent synchronously, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
 
+> [!TIP]
+> Adding email to your web app? Follow the **[web app integration guide](docs/web-app-integration.md)**: a step-by-step walkthrough with backend code samples.
+
 ## Why
 
 Every app ends up sending the same emails: welcome, email verification, password reset, login alerts. notify-flow keeps those emails in one place:
@@ -54,6 +57,30 @@ npm run client:create -- my-app --remote
 
 > [!NOTE]
 > Gmail needs an [app password](https://support.google.com/accounts/answer/185833) when 2-step verification is on.
+
+For development:
+
+```bash
+npm test                                 # vitest inside workerd, with a local D1
+npm run typecheck                        # regenerates worker types, then tsc
+```
+
+## Integrate it into your web app
+
+A web app sends email in three steps:
+
+1. **Get an API key.** Run `npm run client:create -- <app-name> --remote` once per app, then store the key as a secret in the app's backend.
+2. **Call the API from the backend.** Send `POST /v1/email/send` with a template, a recipient and the template's variables. The frontend never calls notify-flow.
+3. **Handle the result.** Retry network errors, `429` and `500` with the same `Idempotency-Key`. Treat `4xx` as integration bugs.
+
+The **[web app integration guide](docs/web-app-integration.md)** covers the details:
+- the architecture;
+- the full request and error reference;
+- Node.js and Python clients;
+- password reset and sign-up flows;
+- custom templates;
+- retry rules;
+- a production checklist.
 
 ## API
 
@@ -154,6 +181,7 @@ src/
 migrations/        # D1 schema
 scripts/           # create-client.mjs
 test/              # vitest, runs inside workerd
+docs/              # web app integration guide, requirements parts, design spec
 ```
 
 ## Roadmap

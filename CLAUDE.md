@@ -16,8 +16,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Docs
 
-- Requirements: `notification-service.md`
-- Design spec: `docs/superpowers/specs/2026-10-08-notification-service-mvp-design.md`
+- Requirements: `notification-service.md` (continues in `docs/requirements/`)
+- Design spec: `docs/superpowers/specs/2026-10-08-notification-service-mvp-design.md` (+ `-part2.md`)
+- Web app integration guide: `docs/web-app-integration.md` (+ `docs/web-app-integration-flows.md`)
+
+Keep every Markdown file under 200 lines: split a longer one into linked parts, or tighten it.
 
 `AGENT.md` is a separate document with instructions for an LLM agent that runs inside a serverless backend (directives, tools, runs). It does not describe this service's code, so don't conflate the two.
 

@@ -44,3 +44,36 @@ export function parseTemplate(body: Record<string, unknown>): Template {
   if (undeclared.size) invalid(`undeclared placeholders: ${[...undeclared].join(", ")}`);
   return { subject, html, text, variables: [...declared] };
 }
+
+const EMAIL_RE = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
+
+export interface SendRequest {
+  template: string;
+  to: string;
+  locale: Locale;
+  variables: Record<string, string>;
+}
+
+export function parseSendRequest(body: Record<string, unknown>): SendRequest {
+  const { template, to, variables } = body;
+  const locale = body.locale ?? "en";
+  if (typeof template !== "string" || !NAME_RE.test(template)) invalid("template must match ^[a-z0-9-]{1,64}$");
+  // \s covers CR/LF; the comma check keeps it to a single recipient.
+  if (typeof to !== "string" || to.length > 254 || !EMAIL_RE.test(to)) invalid("to must be a single valid email address");
+  if (!isLocale(locale)) invalid("locale must be one of it, en, pt-BR");
+  if (
+    typeof variables !== "object" ||
+    variables === null ||
+    Array.isArray(variables) ||
+    !Object.values(variables).every((v) => typeof v === "string")
+  ) {
+    invalid("variables must be an object of strings");
+  }
+  return { template, to: to.toLowerCase(), locale, variables: variables as Record<string, string> };
+}
+
+export function parseIdempotencyKey(req: Request): string | null {
+  const key = req.headers.get("Idempotency-Key");
+  if (key !== null && (key.length < 1 || key.length > 255)) invalid("Idempotency-Key must be 1-255 characters");
+  return key;
+}

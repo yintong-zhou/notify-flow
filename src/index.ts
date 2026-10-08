@@ -1,3 +1,4 @@
+import { sendEmail } from "./routes/email";
 import { health } from "./routes/health";
 import { deleteTemplate, getTemplate, listTemplates, putTemplate } from "./routes/templates";
 import { authenticate } from "./security/auth";
@@ -19,6 +20,10 @@ export async function handle(req: Request, env: Env, send: SendMailFn = sendMail
     const clientId = await authenticate(req, env);
     await checkClientLimit(env, clientId);
 
+    if (pathname === "/v1/email/send") {
+      allow(req, "POST");
+      return await sendEmail(req, env, clientId, send);
+    }
     if (pathname === "/v1/templates") {
       allow(req, "GET");
       return await listTemplates(env, clientId);

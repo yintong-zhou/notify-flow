@@ -35,6 +35,7 @@ You need Node.js 20+ and a Cloudflare account.
 
 ```bash
 npm install
+cp wrangler.jsonc.example wrangler.jsonc # git-ignored: fill in your database_id before deploying
 npm run db:migrate:local
 npm run client:create -- my-app          # prints the API key once
 cp .dev.vars.example .dev.vars           # fill in your SMTP credentials

@@ -1,0 +1,53 @@
+// Copy this file to wrangler.jsonc (git-ignored) and fill in your values:
+//   cp wrangler.jsonc.example wrangler.jsonc
+// Tests and local dev work as-is; only database_id must be changed before deploying.
+// Never put SMTP credentials here: they are Cloudflare Secrets (see "secrets" below).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // Worker name: the URL becomes https://<name>.<account-subdomain>.workers.dev
+  "name": "notify-flow",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+
+  // D1 database holding clients, templates and the delivery log.
+  "d1_databases": [
+    {
+      "binding": "DB",                       // name used in code (env.DB) — do not change
+      "database_name": "notify-flow",        // name used by the npm db:* and client:create scripts
+      // Id printed by `npx wrangler d1 create notify-flow` (also in the dashboard: D1 → notify-flow).
+      // Any value works for local dev and tests.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Per-client rate limit on every /v1/* route.
+  "ratelimits": [
+    {
+      "name": "CLIENT_RATE_LIMITER",         // name used in code — do not change
+      "namespace_id": "1001",                // any integer, unique within your Cloudflare account
+      "simple": { "limit": 60, "period": 60 } // requests per period; period must be 10 or 60 seconds
+    }
+  ],
+
+  // Non-secret settings. Empty string = use the provider preset.
+  "vars": {
+    "SMTP_PROVIDER": "gmail",                // gmail | microsoft | generic
+    "SMTP_AUTH_TYPE": "",                    // plain | login — default: gmail/generic plain, microsoft login
+    "SMTP_HOST": "",                         // override the preset host — required for "generic"
+    "SMTP_PORT": "",                         // override the preset port (465 TLS, 587 STARTTLS); 25 is blocked on Workers
+    "SMTP_SECURITY": "",                     // tls | starttls — override the preset
+    "RECIPIENT_LIMIT_PER_HOUR": "5"          // max emails per client, recipient and template per hour (failed sends excluded)
+  },
+
+  // Secrets: values are NOT stored here. Set each one with `npx wrangler secret put <NAME>`
+  // (and in .dev.vars for `npm run dev`, see .dev.vars.example).
+  //   SMTP_USERNAME    SMTP account, e.g. you@gmail.com
+  //   SMTP_PASSWORD    SMTP password — for Gmail an app password (16 letters, no spaces)
+  //   SMTP_FROM_EMAIL  sender address — with Gmail, the same account as SMTP_USERNAME
+  //   SMTP_FROM_NAME   sender display name
+  "secrets": {
+    "required": ["SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "SMTP_FROM_NAME"]
+  }
+}

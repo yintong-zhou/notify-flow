@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+`wrangler.jsonc` is git-ignored: on a fresh clone run `cp wrangler.jsonc.example wrangler.jsonc` first (tests, dev and typecheck all read it). Config changes go in both files.
+
 - `npm test` — all tests (vitest in workerd via `@cloudflare/vitest-plugin`); one file: `npx vitest run test/send-api.test.ts`; one test: `npx vitest run -t "retries a transient"`
 - `npm run typecheck` — regenerates `worker-configuration.d.ts` (`wrangler types --strict-vars=false`) then `tsc`
 - `npm run dev` / `npm run deploy`

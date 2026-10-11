@@ -1,5 +1,6 @@
 import { getEmail, sendEmail } from "./routes/email";
 import { deleteEvent, getEvent, listEvents, putEvent } from "./routes/events";
+import { sendNotification } from "./routes/notifications";
 import { health } from "./routes/health";
 import { deleteTemplate, getTemplate, listTemplates, putTemplate } from "./routes/templates";
 import { authenticate } from "./security/auth";
@@ -34,6 +35,10 @@ export async function handle(
     if (pathname === "/v1/email/send") {
       allow(req, "POST");
       return await sendEmail(req, env, clientId, send, ctx);
+    }
+    if (pathname === "/v1/notifications") {
+      allow(req, "POST");
+      return await sendNotification(req, env, clientId, send, ctx);
     }
     const email = EMAIL_PATH.exec(pathname);
     if (email) {

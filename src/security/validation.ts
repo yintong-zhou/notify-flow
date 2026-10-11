@@ -81,21 +81,46 @@ export interface SendRequest {
   variables: Record<string, string>;
 }
 
-export function parseSendRequest(body: Record<string, unknown>): SendRequest {
-  const { template, to, variables } = body;
-  const locale = body.locale ?? "en";
-  if (typeof template !== "string" || !NAME_RE.test(template)) invalid("template must match ^[a-z0-9-]{1,64}$");
-  if (typeof to !== "string" || to.length > 254 || !EMAIL_RE.test(to)) invalid("to must be a single valid email address");
-  if (!isLocale(locale)) invalid("locale must be one of it, en, pt-BR");
+/** The recipient checks shared by /v1/email/send and /v1/notifications; `names` labels the fields in errors. */
+function parseTarget(
+  to: unknown,
+  locale: unknown,
+  variables: unknown,
+  names: { to: string; locale: string; variables: string },
+): { to: string; locale: Locale; variables: Record<string, string> } {
+  if (typeof to !== "string" || to.length > 254 || !EMAIL_RE.test(to)) invalid(`${names.to} must be a single valid email address`);
+  if (!isLocale(locale)) invalid(`${names.locale} must be one of it, en, pt-BR`);
   if (
     typeof variables !== "object" ||
     variables === null ||
     Array.isArray(variables) ||
     !Object.values(variables).every((v) => typeof v === "string")
   ) {
-    invalid("variables must be an object of strings");
+    invalid(`${names.variables} must be an object of strings`);
   }
-  return { template, to: to.toLowerCase(), locale, variables: variables as Record<string, string> };
+  return { to: to.toLowerCase(), locale, variables: variables as Record<string, string> };
+}
+
+export function parseSendRequest(body: Record<string, unknown>): SendRequest {
+  const { template } = body;
+  if (typeof template !== "string" || !NAME_RE.test(template)) invalid("template must match ^[a-z0-9-]{1,64}$");
+  return { template, ...parseTarget(body.to, body.locale ?? "en", body.variables, { to: "to", locale: "locale", variables: "variables" }) };
+}
+
+export interface NotificationRequest {
+  event: string;
+  to: string;
+  locale: Locale;
+  variables: Record<string, string>;
+}
+
+export function parseNotification(body: Record<string, unknown>): NotificationRequest {
+  const event = parseEvent(body.event);
+  const { recipient } = body;
+  if (typeof recipient !== "object" || recipient === null || Array.isArray(recipient)) invalid("recipient must be an object");
+  const { email, locale } = recipient as Record<string, unknown>;
+  const names = { to: "recipient.email", locale: "recipient.locale", variables: "data" };
+  return { event, ...parseTarget(email, locale ?? "en", body.data, names) };
 }
 
 export function parseIdempotencyKey(req: Request): string | null {

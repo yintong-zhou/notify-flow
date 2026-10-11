@@ -1,17 +1,18 @@
-import { parseIdempotencyKey, parseSendRequest, readJson } from "../security/validation";
+import { parseIdempotencyKey, parseSendRequest, readJson, type SendRequest } from "../security/validation";
 import { enqueueTemplatedEmail, findDelivery, sendTemplatedEmail } from "../services/email-service";
 import type { SendMailFn } from "../smtp/smtp-client";
 import { HttpError } from "../types";
 
-export async function sendEmail(
+/** Sends now, or enqueues with `Prefer: respond-async`. Shared by /v1/email/send and /v1/notifications. */
+export async function dispatch(
   req: Request,
   env: Env,
   clientId: string,
+  request: SendRequest,
   send: SendMailFn,
   ctx?: ExecutionContext,
 ): Promise<Response> {
   const idempotencyKey = parseIdempotencyKey(req);
-  const request = parseSendRequest(await readJson(req));
   const requestId = req.headers.get("cf-ray") ?? crypto.randomUUID();
   // RFC 7240: preference names are case-insensitive, and Prefer may list several.
   if (/\brespond-async\b/i.test(req.headers.get("Prefer") ?? "")) {
@@ -24,6 +25,10 @@ export async function sendEmail(
   // Keep the send (and its status UPDATE) running if the caller disconnects before it finishes.
   ctx?.waitUntil(result.catch(() => {}));
   return Response.json(await result);
+}
+
+export async function sendEmail(req: Request, env: Env, clientId: string, send: SendMailFn, ctx?: ExecutionContext): Promise<Response> {
+  return dispatch(req, env, clientId, parseSendRequest(await readJson(req)), send, ctx);
 }
 
 export async function getEmail(env: Env, clientId: string, id: string): Promise<Response> {

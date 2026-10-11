@@ -183,3 +183,21 @@ describe("POST /v1/notifications", () => {
     expect((await call("/v1/notifications", { key })).status).toBe(405);
   });
 });
+
+describe("Idempotency-Key validation order", () => {
+  const badKey = { "Idempotency-Key": "k".repeat(256) };
+
+  it("rejects a bad key on /v1/email/send before reading the body", async () => {
+    const { key } = await createClient();
+    const res = await call("/v1/email/send", { key, method: "POST", headers: badKey, rawBody: "a".repeat(256 * 1024 + 1) });
+    expect(res.status).toBe(400);
+    expect((await res.json<any>()).error.code).toBe("validation_error");
+  });
+
+  it("rejects a bad key on /v1/notifications before resolving the event", async () => {
+    const { key } = await createClient();
+    const res = await notify(key, reset(unique("key"), { event: "nobody.knows" }), recorder().send, badKey);
+    expect(res.status).toBe(400);
+    expect((await res.json<any>()).error.code).toBe("validation_error");
+  });
+});

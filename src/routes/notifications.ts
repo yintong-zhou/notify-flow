@@ -1,4 +1,4 @@
-import { parseNotification, readJson } from "../security/validation";
+import { parseIdempotencyKey, parseNotification, readJson } from "../security/validation";
 import type { SendMailFn } from "../smtp/smtp-client";
 import { resolveEvent } from "../templates/events";
 import { dispatch } from "./email";
@@ -11,7 +11,8 @@ export async function sendNotification(
   send: SendMailFn,
   ctx?: ExecutionContext,
 ): Promise<Response> {
+  const idempotencyKey = parseIdempotencyKey(req);
   const { event, ...target } = parseNotification(await readJson(req));
   const template = await resolveEvent(env.DB, clientId, event);
-  return dispatch(req, env, clientId, { template, ...target }, send, ctx);
+  return dispatch(req, env, clientId, { template, ...target }, idempotencyKey, send, ctx);
 }

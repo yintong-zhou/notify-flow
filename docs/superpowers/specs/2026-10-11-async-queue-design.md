@@ -29,7 +29,7 @@ Rejected: `202` with `ctx.waitUntil` and no queue. It is fast, but a failed send
 1. **Same checks as the sync path:** auth, rate limits, validation, `resolveSmtpConfig` (a broken SMTP configuration fails fast with `500 smtp_misconfigured`), `resolveTemplate` and `checkVariables`.
 2. **Idempotency:** a replay of an `Idempotency-Key` returns the row's current status.
 3. **Atomic `INSERT`** with the recipient limit, as today, but with status `queued`. `queued` rows count against the limit, which excludes only `failed`.
-4. **`env.EMAIL_QUEUE.send(message)`.** If enqueueing throws, the row becomes `failed` with `error_code = 'enqueue_failed'` (so it does not count against the limit) and the response is `503 queue_unavailable`. The `INSERT` comes first so the limit stays atomic and no message exists without a row.
+4. **`env.EMAIL_QUEUE.send(message)`.** If enqueueing throws, the row stays `queued` (no second write that could also fail) and the response is `503 queue_unavailable`. An async replay of a still-`queued` row enqueues it again, so the caller retries with the **same** key. A duplicate message is harmless because of the consumer's claim. The `INSERT` comes first so the limit stays atomic and no message exists without a row. *(Revised 2026-10-11 after an adversarial review: marking the row `failed` could itself fail and strand it.)*
 5. **Response:** `202 {"id":"msg_…","status":"queued"}` with `Preference-Applied: respond-async`. An async replay always answers `202` with the current status, even `submitted` or `failed`.
 
 Steps 1–3 move from `sendTemplatedEmail` into a shared `reserveDelivery(env, clientId, request, options, status)`. It returns either an existing result (a replay) or the new row id with the resolved template and config. The sync path then sends as today; the async path enqueues.
@@ -62,7 +62,11 @@ Queues deliver **at least once**, so the consumer must tolerate duplicates. For 
 
 - **Delays:** `delaySeconds` after attempt 1, 2, 3 and 4 is 60, 300, 900 and 1800: about 50 minutes in total.
 - **Logs:** a final failure logs `console.error({id, client_id, error_code})`, as today.
-- **Success not recorded:** if the `submitted` `UPDATE` fails after a successful send, the message is still acked. The email is out and must never be retried. The row stays `processing` and is later closed as `abandoned`, the same ceiling as the sync path.
+- **Outcome not recorded:** if the `retrying`, `failed` or `submitted` write fails after the claim, the consumer enqueues a resume message `{...job, resume: {attempts, status, errorCode}}` and acks the original.
+  - The resume applies the transition with `attempts` as claim token, so duplicates are no-ops.
+  - A `submitted` resume may also correct a row closed as `abandoned` meanwhile.
+  - A `retrying` resume writes `retrying`, retries with the normal delay, and then continues as a normal attempt.
+  - If the queue is down too, the old ceiling applies: the row ends up `abandoned`, and the email is never sent twice. *(Revised 2026-10-11 after an adversarial review.)*
 
 **Consumer config** (`wrangler.jsonc` and the example):
 
@@ -103,7 +107,7 @@ Dependency injection only (`vi.mock` does not work in the Workers pool).
 - **Producer:** a fake `EMAIL_QUEUE` in the test `env` records messages and can be set to throw.
   - `202`, a `queued` row, and a message holding no rendered content;
   - an async replay answers `202` with the current status;
-  - an enqueue failure answers `503`, and the row is `failed / enqueue_failed`;
+  - an enqueue failure answers `503`, the row stays `queued`, and a same-key retry enqueues it again;
   - `queued` rows count against the recipient limit;
   - an oversized message answers `413` with no row;
   - without `Prefer`, the sync path is unchanged (existing tests).

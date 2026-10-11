@@ -67,13 +67,22 @@ describe("POST /v1/email/send with Prefer: respond-async", () => {
     expect(q.sent).toHaveLength(1);
   });
 
-  it("answers 503 and marks the row failed when the queue is down", async () => {
+  it("answers 503 and keeps the row queued when the queue is down, then re-enqueues on a same-key retry", async () => {
     const { key } = await createClient();
-    const res = await sendAsync(key, welcome(unique("down")), fakeQueue(true));
+    const to = unique("down");
+    const headers = { Prefer: "respond-async", "Idempotency-Key": "down-key" };
+    const res = await sendAsync(key, welcome(to), fakeQueue(true), headers);
     expect(res.status).toBe(503);
     const body = await res.json<any>();
     expect(body.error.code).toBe("queue_unavailable");
-    expect(await row(body.id)).toMatchObject({ status: "failed", error_code: "enqueue_failed" });
+    expect(await row(body.id)).toMatchObject({ status: "queued", error_code: null });
+
+    expect((await sendAsync(key, welcome(to), fakeQueue(true), headers)).status).toBe(503);
+    const q = fakeQueue();
+    const retry = await sendAsync(key, welcome(to), q, headers);
+    expect(retry.status).toBe(202);
+    expect(await retry.json()).toEqual({ id: body.id, status: "queued" });
+    expect(q.sent).toEqual([expect.objectContaining({ id: body.id, to })]);
   });
 
   it("counts queued rows against the recipient limit", async () => {
@@ -298,7 +307,7 @@ describe("async send hardening", () => {
     expect(pending).toHaveLength(1);
   });
 
-  it("does not fail a row the consumer already claimed when the queue send throws", async () => {
+  it("leaves a row the consumer already claimed untouched when the queue send throws", async () => {
     const { key } = await createClient();
     // The message got through, the consumer claimed it, then send() still threw (e.g. a lost acknowledgement).
     const queue = {
@@ -313,9 +322,84 @@ describe("async send hardening", () => {
       recorder().send,
       { ...env, EMAIL_QUEUE: queue },
     );
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(503);
     const body = await res.json<any>();
-    expect(body).toEqual({ id: expect.stringMatching(/^msg_/), status: "queued" });
     expect(await row(body.id)).toMatchObject({ status: "processing" });
+  });
+});
+
+/** A D1 whose first statement containing `fragment` throws, as if D1 failed at that moment. */
+function failOnce(fragment: string): D1Database {
+  let failed = false;
+  return {
+    prepare: (sql: string) => {
+      if (failed || !sql.includes(fragment)) return env.DB.prepare(sql);
+      failed = true;
+      const down = async () => Promise.reject(new Error("D1 down"));
+      return { bind: () => ({ run: down, first: down }) };
+    },
+  } as unknown as D1Database;
+}
+
+describe("handleQueue with D1 failing after the claim", () => {
+  it("hands a failed retrying write to a resume message, which finishes the retry", async () => {
+    const body = await queued();
+    const q = fakeQueue();
+    const first = message(body);
+    await consume(recorder(transient()).send, [first.msg], { ...env, DB: failOnce("SET status = ?"), EMAIL_QUEUE: q.queue });
+    expect(first.outcome).toEqual({ acked: true, retries: [] });
+    expect(q.sent).toEqual([{ ...body, resume: { attempts: 1, status: "retrying", errorCode: "smtp_timeout" } }]);
+    expect(await row(body.id)).toMatchObject({ status: "processing", attempts: 1 });
+
+    const resume = message(q.sent[0]);
+    await consume(recorder().send, [resume.msg]);
+    expect(resume.outcome).toEqual({ acked: false, retries: [{ delaySeconds: 60 }] });
+    expect(await row(body.id)).toMatchObject({ status: "retrying", attempts: 1, error_code: "smtp_timeout" });
+
+    // The queue redelivers the resume message after the delay: it is now a normal attempt.
+    const again = message(q.sent[0]);
+    const rec = recorder();
+    await consume(rec.send, [again.msg]);
+    expect(again.outcome.acked).toBe(true);
+    expect(rec.messages).toHaveLength(1);
+    expect(await row(body.id)).toMatchObject({ status: "submitted", attempts: 2, error_code: null });
+  });
+
+  it("hands a failed submitted write to a resume message, even after the row was closed as abandoned", async () => {
+    const body = await queued();
+    const q = fakeQueue();
+    const rec = recorder();
+    const first = message(body);
+    await consume(rec.send, [first.msg], { ...env, DB: failOnce("'submitted'"), EMAIL_QUEUE: q.queue });
+    expect(first.outcome.acked).toBe(true);
+    expect(q.sent).toEqual([{ ...body, resume: { attempts: 1, status: "submitted", errorCode: null } }]);
+    await env.DB.prepare("UPDATE email_deliveries SET status = 'failed', error_code = 'abandoned' WHERE id = ?").bind(body.id).run();
+
+    const resume = message(q.sent[0]);
+    const duplicate = message(q.sent[0]);
+    await consume(rec.send, [resume.msg, duplicate.msg]);
+    expect([resume.outcome.acked, duplicate.outcome.acked]).toEqual([true, true]);
+    expect(rec.messages).toHaveLength(1);
+    expect(await row(body.id)).toMatchObject({ status: "submitted", error_code: null, sent_at: expect.any(Number) });
+  });
+
+  it("hands a failed failed write to a resume message", async () => {
+    const body = await queued();
+    const q = fakeQueue();
+    const first = message(body);
+    const rejected = new SmtpError("smtp_rejected", false, "SMTP 550");
+    await consume(recorder(rejected).send, [first.msg], { ...env, DB: failOnce("SET status = ?"), EMAIL_QUEUE: q.queue });
+    expect(q.sent).toEqual([{ ...body, resume: { attempts: 1, status: "failed", errorCode: "smtp_rejected" } }]);
+    const resume = message(q.sent[0]);
+    await consume(recorder().send, [resume.msg]);
+    expect(resume.outcome.acked).toBe(true);
+    expect(await row(body.id)).toMatchObject({ status: "failed", error_code: "smtp_rejected" });
+  });
+
+  it("falls back to a queue retry when D1 and the queue both fail", async () => {
+    const body = await queued();
+    const { msg, outcome } = message(body);
+    await consume(recorder(transient()).send, [msg], { ...env, DB: failOnce("SET status = ?"), EMAIL_QUEUE: fakeQueue(true).queue });
+    expect(outcome).toEqual({ acked: false, retries: [{ delaySeconds: 60 }] });
   });
 });

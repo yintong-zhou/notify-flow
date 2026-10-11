@@ -83,7 +83,7 @@ Retry only with the same `Idempotency-Key`: that way a retry never produces a se
 | `429 rate_limited` | yes, later | After at least a minute. The per-recipient limit spans one hour |
 | `500` | yes, later | Same key. If it keeps happening, tell the administrator |
 | `502 smtp_failed` | only if the user asks | With a **new** key: the old one returns `failed` again |
-| `503 queue_unavailable` (async only) | yes, later | With a **new** key: the old one returns `failed` again |
+| `503 queue_unavailable` (async only) | yes, later | Same key: the retry enqueues the delivery again, never twice |
 | `400`, `401`, `404`, `413` | no | Integration error: fix the code or the configuration |
 
 How idempotency works:

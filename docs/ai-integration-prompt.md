@@ -55,7 +55,7 @@ Built-in templates (`appName` is always required):
 Custom templates: `PUT /v1/templates/{name}/{locale}` with `{"subject","html","text","variables":[...]}`. Placeholders are written `{{name}}`, and each one must appear in `variables`. `GET /v1/templates` returns the list.
 
 Optional variants. Use the plain synchronous `/v1/email/send` unless I ask for one of these:
-- **Async:** add `Prefer: respond-async`. The answer is `202 {"id","status":"queued"}`, and the service retries SMTP up to 5 times over about 50 minutes. Read the outcome with `GET /v1/email/{id}`. On `503 queue_unavailable`, retry later with a NEW key.
+- **Async:** add `Prefer: respond-async`. The answer is `202 {"id","status":"queued"}`, and the service retries SMTP up to 5 times over about 50 minutes. Read the outcome with `GET /v1/email/{id}`. On `503 queue_unavailable`, retry later with the SAME key.
 - **By event:** `POST /v1/notifications` with `{"event":"auth.password_reset","recipient":{"email":"…","locale":"it"},"data":{…}}`. The service picks the template mapped to the event. Responses, limits and Idempotency-Key are the same, and a key is shared with `/v1/email/send`. Remap events with `PUT /v1/events/{event}` and `{"template":"…"}`.
 
 ## Procedure

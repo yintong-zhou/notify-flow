@@ -196,6 +196,8 @@ export async function sendTemplatedEmail(
 export interface QueuedEmail extends SendRequest {
   id: string;
   clientId: string;
+  /** Set by the consumer when D1 failed to record an attempt's outcome: the transition still to apply. */
+  resume?: { attempts: number; status: "submitted" | "failed" | "retrying"; errorCode: string | null };
 }
 
 // Cloudflare caps a queue message at 128 KB; the margin covers id, clientId and JSON overhead.
@@ -207,21 +209,17 @@ export async function enqueueTemplatedEmail(env: Env, clientId: string, request:
     throw new HttpError(413, "payload_too_large", "Variables are too large for an async send");
   }
   const reserved = await reserveDelivery(env, clientId, request, options, "queued");
-  if ("status" in reserved) return reserved;
+  // A replay of a still-queued row is enqueued again: its first message may never have reached the queue, and a
+  // duplicate is harmless because the consumer's claim lets only one delivery send.
+  if ("status" in reserved && reserved.status !== "queued") return reserved;
   const { id } = reserved;
   try {
     await env.EMAIL_QUEUE.send({ id, clientId, ...request } satisfies QueuedEmail, { contentType: "json" });
   } catch {
-    // Only a still-queued row: if send() threw although the message got through, the consumer may already own it, and
-    // a failed row would make the caller resend. Failed rows don't count against the recipient limit.
-    const { meta } = await env.DB.prepare(
-      "UPDATE email_deliveries SET status = 'failed', error_code = 'enqueue_failed' WHERE id = ? AND status = 'queued'",
-    )
-      .bind(id)
-      .run();
-    if (meta.changes === 0) return { id, status: "queued" };
+    // The row stays queued (no second write that could fail too): a retry with the same Idempotency-Key enqueues it
+    // again, and the daily cron closes it after 24 hours otherwise.
     console.error(JSON.stringify({ id, client_id: clientId, error_code: "enqueue_failed" }));
-    throw new HttpError(503, "queue_unavailable", "The send queue is unavailable: retry later", { id });
+    throw new HttpError(503, "queue_unavailable", "The send queue is unavailable: retry later with the same Idempotency-Key", { id });
   }
   return { id, status: "queued" };
 }

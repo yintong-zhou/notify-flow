@@ -4,12 +4,11 @@ import { checkVariables, render, resolveTemplate } from "../templates/renderer";
 import { HttpError } from "../types";
 import { mailMessage, type QueuedEmail } from "./email-service";
 
+type Outcome = NonNullable<QueuedEmail["resume"]>["status"];
+
 const MAX_ATTEMPTS = 5;
 // Delay before attempts 2-5: about 50 minutes in total, well inside the queue's 24-hour message retention.
 const RETRY_DELAYS_S = [60, 300, 900, 1800];
-
-const setStatus = (db: D1Database, id: string, status: "retrying" | "failed", errorCode: string) =>
-  db.prepare("UPDATE email_deliveries SET status = ?, error_code = ? WHERE id = ?").bind(status, errorCode, id).run();
 
 /** Queues deliver at least once, so each row is claimed before sending: a redelivered message never sends twice. */
 export async function handleQueue(batch: MessageBatch<QueuedEmail>, env: Env, send: SendMailFn): Promise<void> {
@@ -25,6 +24,7 @@ export async function handleQueue(batch: MessageBatch<QueuedEmail>, env: Env, se
 
 async function deliver(msg: Message<QueuedEmail>, env: Env, send: SendMailFn): Promise<void> {
   const job = msg.body;
+  if (job.resume && !(await applyResume(msg, env))) return;
   const claimed = await env.DB.prepare(
     `UPDATE email_deliveries SET status = 'processing', attempts = attempts + 1, claimed_at = unixepoch()
      WHERE id = ? AND status IN ('queued', 'retrying') RETURNING attempts`,
@@ -33,6 +33,7 @@ async function deliver(msg: Message<QueuedEmail>, env: Env, send: SendMailFn): P
     .first<{ attempts: number }>();
   // Already submitted or failed, or being sent by another delivery of the same message.
   if (!claimed) return msg.ack();
+  const { attempts } = claimed;
 
   try {
     const config = resolveSmtpConfig(env);
@@ -41,19 +42,66 @@ async function deliver(msg: Message<QueuedEmail>, env: Env, send: SendMailFn): P
     await send(config, mailMessage(config, job.id, job.to, render(template, job.variables)));
   } catch (e) {
     const smtp = e instanceof SmtpError ? e : null;
-    if (smtp?.transient && claimed.attempts < MAX_ATTEMPTS) {
-      await setStatus(env.DB, job.id, "retrying", smtp.code);
-      return msg.retry({ delaySeconds: RETRY_DELAYS_S[claimed.attempts - 1] });
+    if (smtp?.transient && attempts < MAX_ATTEMPTS) {
+      if (await record(msg, env, attempts, "retrying", smtp.code)) msg.retry({ delaySeconds: RETRY_DELAYS_S[attempts - 1] });
+      return;
     }
     // Permanent, unconfirmed (a retry could send twice), out of attempts, or the template no longer fits.
     const errorCode = smtp?.code ?? (e instanceof HttpError ? e.code : "internal_error");
-    await setStatus(env.DB, job.id, "failed", errorCode);
     console.error(JSON.stringify({ id: job.id, client_id: job.clientId, error_code: errorCode }));
-    return msg.ack();
+    if (await record(msg, env, attempts, "failed", errorCode)) msg.ack();
+    return;
   }
-  // If this UPDATE throws, handleQueue retries, the claim then fails, and the message is acked: the email is out.
-  await env.DB.prepare("UPDATE email_deliveries SET status = 'submitted', error_code = NULL, sent_at = unixepoch() WHERE id = ?")
-    .bind(job.id)
+  if (await record(msg, env, attempts, "submitted", null)) msg.ack();
+}
+
+/**
+ * Records the claimed attempt's outcome. If D1 fails, the outcome travels in a resume message instead: a plain retry
+ * would find the row `processing` and drop it, losing the remaining attempts or misreporting a sent email.
+ * Returns false when it handed off (the original message is then acked).
+ */
+async function record(msg: Message<QueuedEmail>, env: Env, attempts: number, status: Outcome, errorCode: string | null): Promise<boolean> {
+  const { resume: _, ...job } = msg.body;
+  try {
+    const sql =
+      status === "submitted"
+        ? "UPDATE email_deliveries SET status = 'submitted', error_code = NULL, sent_at = unixepoch() WHERE id = ?"
+        : "UPDATE email_deliveries SET status = ?, error_code = ? WHERE id = ?";
+    const stmt = env.DB.prepare(sql);
+    await (status === "submitted" ? stmt.bind(job.id) : stmt.bind(status, errorCode, job.id)).run();
+    return true;
+  } catch {
+    // ponytail: if the queue is down too, this throws and handleQueue's retry drops the row as before (it ends up
+    // abandoned, never sent twice). An outbox table would cover that double outage.
+    await env.EMAIL_QUEUE.send({ ...job, resume: { attempts, status, errorCode } } satisfies QueuedEmail, { contentType: "json" });
+    msg.ack();
+    return false;
+  }
+}
+
+/**
+ * Applies a resume message's transition. `attempts` is the claim token: a duplicate resume, or a row a later attempt
+ * already moved on, is left alone. Returns true when the message should continue as a normal delivery.
+ */
+async function applyResume(msg: Message<QueuedEmail>, env: Env): Promise<boolean> {
+  const { id, resume } = msg.body;
+  const { attempts, status, errorCode } = resume!;
+  // A sent email may also correct a row closed as abandoned meanwhile: we know it went out.
+  const from = status === "submitted" ? "(status = 'processing' OR (status = 'failed' AND error_code = 'abandoned'))" : "status = 'processing'";
+  const sentAt = status === "submitted" ? ", sent_at = unixepoch()" : "";
+  const { meta } = await env.DB.prepare(
+    `UPDATE email_deliveries SET status = ?, error_code = ?${sentAt} WHERE id = ? AND attempts = ? AND ${from}`,
+  )
+    .bind(status, errorCode, id, attempts)
     .run();
-  msg.ack();
+  if (status !== "retrying") {
+    msg.ack();
+    return false;
+  }
+  if (meta.changes > 0) {
+    msg.retry({ delaySeconds: RETRY_DELAYS_S[attempts - 1] });
+    return false;
+  }
+  // Already retrying: this is the delayed redelivery, so it is now a normal attempt.
+  return true;
 }

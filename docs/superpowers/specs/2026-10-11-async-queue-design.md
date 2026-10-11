@@ -45,7 +45,7 @@ Steps 1–3 move from `sendTemplatedEmail` into a shared `reserveDelivery(env, c
 
 Queues deliver **at least once**, so the consumer must tolerate duplicates. For each message:
 
-1. **Claim:** `UPDATE email_deliveries SET status = 'processing', attempts = attempts + 1 WHERE id = ? AND status IN ('queued', 'retrying')`.
+1. **Claim:** `UPDATE email_deliveries SET status = 'processing', attempts = attempts + 1, claimed_at = unixepoch() WHERE id = ? AND status IN ('queued', 'retrying') RETURNING attempts`.
    - **0 rows changed:** the row is `submitted`, `failed`, or `processing` (another delivery is running or died mid-send). The consumer calls `ack()` and sends nothing. This claim is the double-send guard.
 2. **Render:** resolve the template again and render it. A template changed since the request is sent in its new version.
 3. **One SMTP attempt** per delivery. The sync path's in-request retry loop is not used: the queue spaces the retries out.
@@ -84,6 +84,7 @@ The queue is created once before deploying: `npx wrangler queues create notify-f
 ## Stuck rows
 
 - **`processing` for more than 5 minutes:** the Worker died mid-send. The existing replay logic closes the row as `failed / abandoned`; `GET /v1/email/:id` applies the same rule. "Maybe not sent" is preferred over "sent twice".
+  - The 5 minutes count from `COALESCE(claimed_at, created_at)`. A queued row can be claimed long after it was created, so `created_at` alone would close a send that is still running. The sync path leaves `claimed_at` NULL, which keeps its behavior unchanged.
 - **`queued` or `retrying` for more than 24 hours:** the queue dropped the message after `max_retries` unexpected errors. The daily cron runs one extra `UPDATE` that closes these rows as `failed / abandoned`, before purging old rows.
 
 ## API: `GET /v1/email/:id`
@@ -93,7 +94,7 @@ The queue is created once before deploying: `npx wrangler queues create notify-f
 - **Limits:** it is a `/v1/*` route, so the IP and per-client rate limits apply.
 - **Abandoned rows:** a `processing` row older than 5 minutes is closed and reported as `failed`.
 
-No migration: the `status` CHECK already allows `queued` and `retrying`.
+**Migration `0004_deliveries_claimed_at.sql`:** `ALTER TABLE email_deliveries ADD COLUMN claimed_at INTEGER;` (unix seconds of the consumer's claim). The `status` CHECK already allows `queued` and `retrying`.
 
 ## Testing
 
@@ -114,11 +115,11 @@ Dependency injection only (`vi.mock` does not work in the Workers pool).
   - a permanent error and `smtp_unconfirmed`: `failed`, no retry;
   - a deleted template: `failed / template_not_found`;
   - D1 failing before the claim: retried, nothing sent.
-- **`GET /v1/email/:id`:** own row, another client's row, unknown id, abandoned `processing` row.
+- **`GET /v1/email/:id`:** own row, another client's row, unknown id, abandoned `processing` row, and an old row claimed just now (not abandoned).
 - **Cron:** closes `queued` and `retrying` rows older than 24 hours and keeps recent ones.
 
 ## Documentation
 
-- **Integration guide:** a section on `Prefer: respond-async`, `202`, and polling `GET /v1/email/:id`.
+- **Integration guide:** a new linked part, `docs/web-app-integration-async.md`, on `Prefer: respond-async`, `202`, and polling `GET /v1/email/:id`. The main guide is at 184 lines, so it gets only a link.
 - **README and CLAUDE.md:** drop Queues from the roadmap and "Not in the MVP", and update the request flow and the status list.
 - Every Markdown file stays under 200 lines.

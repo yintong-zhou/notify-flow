@@ -1,4 +1,4 @@
-import { sendEmail } from "./routes/email";
+import { getEmail, sendEmail } from "./routes/email";
 import { health } from "./routes/health";
 import { deleteTemplate, getTemplate, listTemplates, putTemplate } from "./routes/templates";
 import { authenticate } from "./security/auth";
@@ -9,6 +9,7 @@ import { sendMail, type SendMailFn } from "./smtp/smtp-client";
 import { HttpError } from "./types";
 
 const TEMPLATE_PATH = /^\/v1\/templates\/([^/]+)\/([^/]+)$/;
+const EMAIL_PATH = /^\/v1\/email\/(msg_[0-9a-f-]{36})$/;
 
 export async function handle(
   req: Request,
@@ -31,6 +32,11 @@ export async function handle(
     if (pathname === "/v1/email/send") {
       allow(req, "POST");
       return await sendEmail(req, env, clientId, send, ctx);
+    }
+    const email = EMAIL_PATH.exec(pathname);
+    if (email) {
+      allow(req, "GET");
+      return await getEmail(env, clientId, email[1]);
     }
     if (pathname === "/v1/templates") {
       allow(req, "GET");

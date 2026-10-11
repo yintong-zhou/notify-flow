@@ -1,6 +1,7 @@
 import { parseIdempotencyKey, parseSendRequest, readJson } from "../security/validation";
-import { enqueueTemplatedEmail, sendTemplatedEmail } from "../services/email-service";
+import { enqueueTemplatedEmail, findDelivery, sendTemplatedEmail } from "../services/email-service";
 import type { SendMailFn } from "../smtp/smtp-client";
+import { HttpError } from "../types";
 
 export async function sendEmail(
   req: Request,
@@ -21,4 +22,11 @@ export async function sendEmail(
   // Keep the send (and its status UPDATE) running if the caller disconnects before it finishes.
   ctx?.waitUntil(result.catch(() => {}));
   return Response.json(await result);
+}
+
+export async function getEmail(env: Env, clientId: string, id: string): Promise<Response> {
+  // Another client's id answers the same 404 as an unknown one, so existence never leaks.
+  const delivery = await findDelivery(env.DB, clientId, "id", id);
+  if (!delivery) throw new HttpError(404, "not_found", "Email not found");
+  return Response.json(delivery);
 }

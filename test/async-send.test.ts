@@ -225,3 +225,40 @@ describe("handleQueue", () => {
     expect(await row(bad.id)).toMatchObject({ status: "queued", attempts: 0 });
   });
 });
+
+describe("GET /v1/email/:id", () => {
+  const get = (key: string, id: string, method = "GET") => call(`/v1/email/${id}`, { key, method });
+
+  it("returns the status of the client's own email only", async () => {
+    const { key } = await createClient();
+    const other = await createClient("other");
+    const { id } = await (await sendAsync(key, welcome(unique("get")))).json<any>();
+    const res = await get(key, id);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id, status: "queued", error_code: null });
+    for (const [k, path] of [[other.key, id], [key, `msg_${crypto.randomUUID()}`], [key, "not-an-id"]]) {
+      const miss = await get(k, path);
+      expect(miss.status).toBe(404);
+      expect((await miss.json<any>()).error.code).toBe("not_found");
+    }
+    expect((await get(key, id, "POST")).status).toBe(405);
+  });
+
+  it("closes an abandoned processing row but not an old one claimed just now", async () => {
+    const { id: clientId, key } = await createClient();
+    const insert = async (claimedAt: "NULL" | "unixepoch()") => {
+      const id = `msg_${crypto.randomUUID()}`;
+      await env.DB.prepare(
+        `INSERT INTO email_deliveries (id, request_id, client_id, template, provider, recipient, status, created_at, claimed_at)
+         VALUES (?, 'r', ?, 'welcome', 'gmail', 'x@example.com', 'processing', unixepoch() - 3600, ${claimedAt})`,
+      )
+        .bind(id, clientId)
+        .run();
+      return id;
+    };
+    const stale = await insert("NULL");
+    const fresh = await insert("unixepoch()");
+    expect(await (await get(key, stale)).json()).toEqual({ id: stale, status: "failed", error_code: "abandoned" });
+    expect(await (await get(key, fresh)).json()).toEqual({ id: fresh, status: "processing", error_code: null });
+  });
+});

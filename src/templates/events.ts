@@ -21,8 +21,8 @@ export async function findEventRoute(
     .bind(clientId, event)
     .first<{ template: string }>();
   if (row) return { template: row.template, builtin: false };
-  // Event names always contain a dot, so they can never match an Object.prototype key.
-  const builtin = BUILTIN_EVENTS[event] as string | undefined;
+  // hasOwn, as in defaults.ts: findEventRoute is exported, so it must not rely on callers validating the name.
+  const builtin = Object.hasOwn(BUILTIN_EVENTS, event) ? BUILTIN_EVENTS[event] : undefined;
   return builtin ? { template: builtin, builtin: true } : null;
 }
 

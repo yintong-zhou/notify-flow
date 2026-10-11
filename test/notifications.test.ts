@@ -201,3 +201,14 @@ describe("Idempotency-Key validation order", () => {
     expect((await res.json<any>()).error.code).toBe("validation_error");
   });
 });
+
+describe("event mappings and tenant isolation", () => {
+  it("does not let a client map an event to another client's template", async () => {
+    const a = await createClient("a");
+    const b = await createClient("b");
+    await insertTemplate(a.id, "a-only", "en", custom);
+    const res = await putEvent(b.key, "billing.invoice_ready", { template: "a-only" });
+    expect(res.status).toBe(404);
+    expect((await res.json<any>()).error.code).toBe("template_not_found");
+  });
+});

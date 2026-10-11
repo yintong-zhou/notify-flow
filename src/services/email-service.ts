@@ -212,8 +212,14 @@ export async function enqueueTemplatedEmail(env: Env, clientId: string, request:
   try {
     await env.EMAIL_QUEUE.send({ id, clientId, ...request } satisfies QueuedEmail, { contentType: "json" });
   } catch {
-    // Failed rows don't count against the recipient limit, so the caller can simply retry.
-    await env.DB.prepare("UPDATE email_deliveries SET status = 'failed', error_code = 'enqueue_failed' WHERE id = ?").bind(id).run();
+    // Only a still-queued row: if send() threw although the message got through, the consumer may already own it, and
+    // a failed row would make the caller resend. Failed rows don't count against the recipient limit.
+    const { meta } = await env.DB.prepare(
+      "UPDATE email_deliveries SET status = 'failed', error_code = 'enqueue_failed' WHERE id = ? AND status = 'queued'",
+    )
+      .bind(id)
+      .run();
+    if (meta.changes === 0) return { id, status: "queued" };
     console.error(JSON.stringify({ id, client_id: clientId, error_code: "enqueue_failed" }));
     throw new HttpError(503, "queue_unavailable", "The send queue is unavailable: retry later", { id });
   }

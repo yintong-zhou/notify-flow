@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { purgeDeliveries, type QueuedEmail } from "../src/services/email-service";
 import { handleQueue } from "../src/services/queue-consumer";
 import { SmtpError, type SendMailFn } from "../src/smtp/smtp-client";
+import { handle } from "../src/index";
 import { call, createClient, fakeQueue, recorder } from "./helpers";
 
 const welcome = (to: string, variables: Record<string, string> = { appName: "Acme", name: "Mario" }) => ({ template: "welcome", to, variables });
@@ -280,5 +281,41 @@ describe("purgeDeliveries and stuck queued rows", () => {
     expect(await row(ids.oldQueued)).toMatchObject({ status: "failed", error_code: "abandoned" });
     expect(await row(ids.oldRetrying)).toMatchObject({ status: "failed", error_code: "abandoned" });
     expect(await row(ids.newQueued)).toMatchObject({ status: "queued", error_code: null });
+  });
+});
+
+describe("async send hardening", () => {
+  it("keeps the enqueue alive with ctx.waitUntil", async () => {
+    const { key } = await createClient();
+    const pending: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p) } as unknown as ExecutionContext;
+    const req = new Request("https://notify.test/v1/email/send", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, Prefer: "respond-async" },
+      body: JSON.stringify(welcome(unique("alive"))),
+    });
+    expect((await handle(req, { ...env, EMAIL_QUEUE: fakeQueue().queue }, recorder().send, ctx)).status).toBe(202);
+    expect(pending).toHaveLength(1);
+  });
+
+  it("does not fail a row the consumer already claimed when the queue send throws", async () => {
+    const { key } = await createClient();
+    // The message got through, the consumer claimed it, then send() still threw (e.g. a lost acknowledgement).
+    const queue = {
+      send: async (body: QueuedEmail) => {
+        await env.DB.prepare("UPDATE email_deliveries SET status = 'processing' WHERE id = ?").bind(body.id).run();
+        throw new Error("ack lost");
+      },
+    } as unknown as Queue;
+    const res = await call(
+      "/v1/email/send",
+      { key, method: "POST", body: welcome(unique("lost")), headers: { Prefer: "respond-async" } },
+      recorder().send,
+      { ...env, EMAIL_QUEUE: queue },
+    );
+    expect(res.status).toBe(202);
+    const body = await res.json<any>();
+    expect(body).toEqual({ id: expect.stringMatching(/^msg_/), status: "queued" });
+    expect(await row(body.id)).toMatchObject({ status: "processing" });
   });
 });

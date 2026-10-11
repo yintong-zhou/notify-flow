@@ -15,8 +15,10 @@ export async function sendEmail(
   const requestId = req.headers.get("cf-ray") ?? crypto.randomUUID();
   // RFC 7240: preference names are case-insensitive, and Prefer may list several.
   if (/\brespond-async\b/i.test(req.headers.get("Prefer") ?? "")) {
-    const queued = await enqueueTemplatedEmail(env, clientId, request, { idempotencyKey, requestId });
-    return Response.json(queued, { status: 202, headers: { "Preference-Applied": "respond-async" } });
+    const queued = enqueueTemplatedEmail(env, clientId, request, { idempotencyKey, requestId });
+    // As below: a caller disconnecting between the INSERT and the enqueue must not leave a queued row with no message.
+    ctx?.waitUntil(queued.catch(() => {}));
+    return Response.json(await queued, { status: 202, headers: { "Preference-Applied": "respond-async" } });
   }
   const result = sendTemplatedEmail(env, clientId, request, { idempotencyKey, requestId }, send);
   // Keep the send (and its status UPDATE) running if the caller disconnects before it finishes.

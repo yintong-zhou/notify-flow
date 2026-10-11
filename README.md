@@ -3,7 +3,7 @@
 A self-hosted transactional email service for Cloudflare Workers. Your backends call one authenticated REST API, and notify-flow renders the email from a template and sends it over plain SMTP to Gmail, Microsoft 365 or any other SMTP server. It does not depend on Resend, SendGrid, Mailgun or similar platforms.
 
 > [!NOTE]
-> The MVP is implemented: emails are sent synchronously, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
+> The MVP is implemented: emails are sent synchronously, or asynchronously through Cloudflare Queues on request, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
 
 > [!TIP]
 > Adding email to your web app? Follow the **[web app integration guide](docs/web-app-integration.md)**: a step-by-step walkthrough with backend code samples. Or paste the **[AI integration prompt](docs/ai-integration-prompt.md)** into a coding agent and let it do the work.
@@ -25,7 +25,7 @@ Frontend ──► Your backend ──► notify-flow (Worker) ──► SMTP se
                  │                  ├─ authenticate the client (API key)
                  │                  ├─ validate payload and rate limit
                  │                  ├─ render the template (subject, HTML, text)
-                 │                  ├─ send over TLS / STARTTLS, retrying transient errors
+                 │                  ├─ send over TLS / STARTTLS, now or from a queue, retrying transient errors
                  │                  └─ log the delivery in D1
                  └─ owns auth logic (tokens, reset URLs, user checks)
 ```
@@ -49,8 +49,8 @@ To deploy:
 
 ```bash
 npx wrangler d1 create notify-flow       # copy the database_id into wrangler.jsonc
-npm run db:migrate:remote
-npx wrangler queues create notify-flow-emails
+npm run db:migrate:remote                # on upgrades too: migrate before npm run deploy
+npx wrangler queues create notify-flow-emails  # once: the async send queue
 npx wrangler secret put SMTP_USERNAME    # repeat for SMTP_PASSWORD, SMTP_FROM_EMAIL, SMTP_FROM_NAME
 npm run deploy
 npm run client:create -- my-app --remote
@@ -74,14 +74,7 @@ A web app sends email in three steps:
 2. **Call the API from the backend.** Send `POST /v1/email/send` with a template, a recipient and the template's variables. The frontend never calls notify-flow.
 3. **Handle the result.** Retry network errors, `429` and `500` with the same `Idempotency-Key`. Treat `4xx` as integration bugs.
 
-The **[web app integration guide](docs/web-app-integration.md)** covers the details:
-- the architecture;
-- the full request and error reference;
-- Node.js and Python clients;
-- password reset and sign-up flows;
-- custom templates;
-- retry rules;
-- a production checklist.
+The **[web app integration guide](docs/web-app-integration.md)** covers the details: architecture, the full request and error reference, Node.js and Python clients, password reset and sign-up flows, custom templates, retry rules, [asynchronous sending](docs/web-app-integration-async.md) and a production checklist.
 
 ## API
 
@@ -121,6 +114,10 @@ How a send is handled:
 
 > [!NOTE]
 > `submitted` means the SMTP server accepted the message. It does not mean the message reached the inbox, which is why there is no `delivered` status.
+
+### Check a delivery
+
+`GET /v1/email/:id` returns `{ "id", "status", "error_code" }` for one of your own sends; another client's id answers `404`. Statuses: `queued`, `processing`, `retrying`, `submitted`, `failed`.
 
 ### Manage templates
 
@@ -176,7 +173,7 @@ src/
 ├── index.ts       # Worker entry point and router
 ├── routes/        # email, templates, health
 ├── security/      # auth, payload validation, rate limiting
-├── services/      # email-service: idempotency, retries, delivery log
+├── services/      # email-service (idempotency, retries, delivery log), queue-consumer (async sends)
 ├── templates/     # renderer + built-in defaults
 ├── smtp/          # SMTP client + provider presets
 └── types/

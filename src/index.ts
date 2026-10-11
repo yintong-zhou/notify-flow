@@ -1,4 +1,5 @@
 import { getEmail, sendEmail } from "./routes/email";
+import { deleteEvent, getEvent, listEvents, putEvent } from "./routes/events";
 import { health } from "./routes/health";
 import { deleteTemplate, getTemplate, listTemplates, putTemplate } from "./routes/templates";
 import { authenticate } from "./security/auth";
@@ -10,6 +11,7 @@ import { HttpError } from "./types";
 
 const TEMPLATE_PATH = /^\/v1\/templates\/([^/]+)\/([^/]+)$/;
 const EMAIL_PATH = /^\/v1\/email\/(msg_[0-9a-f-]{36})$/;
+const EVENT_PATH = /^\/v1\/events\/([^/]+)$/;
 
 export async function handle(
   req: Request,
@@ -37,6 +39,18 @@ export async function handle(
     if (email) {
       allow(req, "GET");
       return await getEmail(env, clientId, email[1]);
+    }
+    if (pathname === "/v1/events") {
+      allow(req, "GET");
+      return await listEvents(env, clientId);
+    }
+    const eventMatch = EVENT_PATH.exec(pathname);
+    if (eventMatch) {
+      allow(req, "GET", "PUT", "DELETE");
+      const event = eventMatch[1];
+      if (req.method === "GET") return await getEvent(env, clientId, event);
+      if (req.method === "PUT") return await putEvent(req, env, clientId, event);
+      return await deleteEvent(env, clientId, event);
     }
     if (pathname === "/v1/templates") {
       allow(req, "GET");

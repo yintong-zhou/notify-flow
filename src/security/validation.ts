@@ -39,6 +39,21 @@ export function parseTemplateKey(name: string, locale: string): { name: string; 
   return { name, locale };
 }
 
+const EVENT_RE = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/;
+
+export function parseEvent(raw: unknown): string {
+  if (typeof raw !== "string" || raw.length > 64 || !EVENT_RE.test(raw)) {
+    invalid("event must be at most 64 characters matching ^[a-z0-9_]+(\\.[a-z0-9_]+)+$");
+  }
+  return raw;
+}
+
+export function parseEventRoute(body: Record<string, unknown>): { template: string } {
+  const { template } = body;
+  if (typeof template !== "string" || !NAME_RE.test(template)) invalid("template must match ^[a-z0-9-]{1,64}$");
+  return { template };
+}
+
 export function parseTemplate(body: Record<string, unknown>): Template {
   const { subject, html, text, variables } = body;
   if (typeof subject !== "string" || subject.length < 1 || subject.length > 255 || /[\r\n]/.test(subject)) {

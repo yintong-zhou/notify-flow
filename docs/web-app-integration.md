@@ -4,7 +4,7 @@ This guide shows how a web app's backend sends transactional emails through noti
 
 ## Overview
 
-To send a transactional email, your web app's backend makes one HTTP call to notify-flow, with a template name and its variables. notify-flow does the rest and returns a delivery id.
+To send a transactional email, your web app's backend makes one HTTP call to notify-flow, with a template name (or an [event](web-app-integration-events.md)) and its variables. notify-flow does the rest and returns a delivery id.
 
 | notify-flow handles | Your web app handles |
 | --- | --- |

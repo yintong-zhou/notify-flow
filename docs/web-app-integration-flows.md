@@ -75,7 +75,7 @@ Writing templates:
 
 ## Errors, retries and idempotency
 
-Retry only with the same `Idempotency-Key`: that way a retry never produces a second email. notify-flow already makes up to 3 SMTP attempts before it answers.
+Retry only with the same `Idempotency-Key`: that way a retry never produces a second email. notify-flow already makes up to 3 SMTP attempts before it answers (with [async sending](web-app-integration-async.md), up to 5 over about 50 minutes).
 
 | Outcome | Retry? | How |
 | --- | --- | --- |
@@ -83,6 +83,7 @@ Retry only with the same `Idempotency-Key`: that way a retry never produces a se
 | `429 rate_limited` | yes, later | After at least a minute. The per-recipient limit spans one hour |
 | `500` | yes, later | Same key. If it keeps happening, tell the administrator |
 | `502 smtp_failed` | only if the user asks | With a **new** key: the old one returns `failed` again |
+| `503 queue_unavailable` (async only) | yes, later | With a **new** key: the old one returns `failed` again |
 | `400`, `401`, `404`, `413` | no | Integration error: fix the code or the configuration |
 
 How idempotency works:

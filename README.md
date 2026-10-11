@@ -3,7 +3,7 @@
 A self-hosted transactional email service for Cloudflare Workers. Your backends call one authenticated REST API, and notify-flow renders the email from a template and sends it over plain SMTP to Gmail, Microsoft 365 or any other SMTP server. It does not depend on Resend, SendGrid, Mailgun or similar platforms.
 
 > [!NOTE]
-> The MVP is implemented: emails are sent synchronously, or asynchronously through Cloudflare Queues on request, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
+> The MVP is implemented: emails are sent by template name or by event, synchronously or asynchronously through Cloudflare Queues, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
 
 > [!TIP]
 > Adding email to your web app? Follow the **[web app integration guide](docs/web-app-integration.md)**: a step-by-step walkthrough with backend code samples. Or paste the **[AI integration prompt](docs/ai-integration-prompt.md)** into a coding agent and let it do the work.
@@ -24,7 +24,7 @@ Frontend ──► Your backend ──► notify-flow (Worker) ──► SMTP se
                  │                  │
                  │                  ├─ authenticate the client (API key)
                  │                  ├─ validate payload and rate limit
-                 │                  ├─ render the template (subject, HTML, text)
+                 │                  ├─ pick the template (by name or event), render subject, HTML, text
                  │                  ├─ send over TLS / STARTTLS, now or from a queue, retrying transient errors
                  │                  └─ log the delivery in D1
                  └─ owns auth logic (tokens, reset URLs, user checks)
@@ -71,7 +71,7 @@ npm run typecheck                        # regenerates worker types, then tsc
 A web app sends email in three steps:
 
 1. **Get an API key.** Run `npm run client:create -- <app-name> --remote` once per app, then store the key as a secret in the app's backend.
-2. **Call the API from the backend.** Send `POST /v1/email/send` with a template, a recipient and the template's variables. The frontend never calls notify-flow.
+2. **Call the API from the backend.** Send `POST /v1/email/send` with a template, a recipient and the template's variables, or `POST /v1/notifications` with an event instead of a template. The frontend never calls notify-flow.
 3. **Handle the result.** Retry network errors, `429` and `500` with the same `Idempotency-Key`. Treat `4xx` as integration bugs.
 
 The **[web app integration guide](docs/web-app-integration.md)** covers the details: architecture, the full request and error reference, Node.js and Python clients, password reset and sign-up flows, custom templates, retry rules, [asynchronous sending](docs/web-app-integration-async.md) and a production checklist.
@@ -161,7 +161,7 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 
 - **Per-client API keys**, stored only as SHA-256 hashes.
 - **Idempotency:** retrying a request with the same `Idempotency-Key` never sends a duplicate email.
-- **Rate limits:** 60 requests per minute per client, and `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template for each client. Failed sends do not count.
+- **Rate limits:** 300 requests per minute per IP (checked before the API key), 60 per minute per client, and `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template for each client. Failed sends do not count.
 - **No secrets in logs:** delivery records and logs never contain variables, tokens, reset URLs or SMTP credentials.
 
 ## Project structure

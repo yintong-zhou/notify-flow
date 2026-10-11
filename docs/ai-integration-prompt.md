@@ -31,6 +31,7 @@ I want to do as little as possible. Only ask me what you can't find out on your 
 | 400 `validation_error` / `invalid_json` / `invalid_variables` | It's a bug: don't retry |
 | 401 `unauthorized` | Wrong configuration (URL or key) |
 | 404 `template_not_found` | The template doesn't exist |
+| 404 `event_not_found` | Only with `/v1/notifications`: the event has no mapping |
 | 413 `payload_too_large` | Body over 256 KB |
 | 429 `rate_limited` | Retry after at least 60 s with the SAME Idempotency-Key |
 | 500 | Retry later with the SAME key |
@@ -42,16 +43,20 @@ I want to do as little as possible. Only ask me what you can't find out on your 
 
 Built-in templates (`appName` is always required):
 
-| Event | Template | Variables | Idempotency-Key |
-|---|---|---|---|
-| Sign-up | `welcome` | appName, name | `welcome:<userId>` |
-| Email verification | `verify-email` | appName, name, verifyUrl | `verify:<userId>:<tokenId>` |
-| Password reset | `password-reset` | appName, name, resetUrl | `reset:<userId>:<tokenId>` |
-| Password changed | `password-changed` | appName, name | `pwchanged:<userId>:<timestamp>` |
-| New sign-in | `login-alert` | appName, name, device, ipAddress, time | `login:<sessionId>` |
-| Generic notice | `generic-notification` | appName, title, message | `notice:<eventId>` |
+| Flow | Template | Built-in event | Variables | Idempotency-Key |
+|---|---|---|---|---|
+| Sign-up | `welcome` | `user.welcome` | appName, name | `welcome:<userId>` |
+| Email verification | `verify-email` | `auth.email_verification` | appName, name, verifyUrl | `verify:<userId>:<tokenId>` |
+| Password reset | `password-reset` | `auth.password_reset` | appName, name, resetUrl | `reset:<userId>:<tokenId>` |
+| Password changed | `password-changed` | `auth.password_changed` | appName, name | `pwchanged:<userId>:<timestamp>` |
+| New sign-in | `login-alert` | `auth.login_alert` | appName, name, device, ipAddress, time | `login:<sessionId>` |
+| Generic notice | `generic-notification` | `notification.generic` | appName, title, message | `notice:<eventId>` |
 
 Custom templates: `PUT /v1/templates/{name}/{locale}` with `{"subject","html","text","variables":[...]}`. Placeholders are written `{{name}}`, and each one must appear in `variables`. `GET /v1/templates` returns the list.
+
+Optional variants. Use the plain synchronous `/v1/email/send` unless I ask for one of these:
+- **Async:** add `Prefer: respond-async`. The answer is `202 {"id","status":"queued"}`, and the service retries SMTP up to 5 times over about 50 minutes. Read the outcome with `GET /v1/email/{id}`. On `503 queue_unavailable`, retry later with a NEW key.
+- **By event:** `POST /v1/notifications` with `{"event":"auth.password_reset","recipient":{"email":"…","locale":"it"},"data":{…}}`. The service picks the template mapped to the event. Responses, limits and Idempotency-Key are the same, and a key is shared with `/v1/email/send`. Remap events with `PUT /v1/events/{event}` and `{"template":"…"}`.
 
 ## Procedure
 
@@ -110,7 +115,7 @@ Steps marked "Me:" are mine; you run all the others, in a folder OUTSIDE this re
 
 1. `git clone https://github.com/yintong-zhou/notify-flow && cd notify-flow && npm install && cp wrangler.jsonc.example wrangler.jsonc`
 2. Me: `npx wrangler login`
-3. `npx wrangler d1 create notify-flow`, then copy the `database_id` into `wrangler.jsonc` and run `npm run db:migrate:remote`.
+3. `npx wrangler d1 create notify-flow`, then copy the `database_id` into `wrangler.jsonc`, run `npm run db:migrate:remote` (confirm with `y`) and create the send queue with `npx wrangler queues create notify-flow-emails`. The deploy fails if the queue doesn't exist.
 4. Ask me which provider I use and set the `vars` in `wrangler.jsonc`:
    - Gmail: `SMTP_PROVIDER: "gmail"`. It needs an app password (with 2-Step Verification on): https://support.google.com/accounts/answer/185833
    - Outlook / Microsoft 365: `SMTP_PROVIDER: "microsoft"`.

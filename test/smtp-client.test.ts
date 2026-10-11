@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveSmtpConfig, type SmtpConfig } from "../src/smtp/provider";
-import { base64, buildMessage, dotStuff, sendMail, type MailMessage } from "../src/smtp/smtp-client";
+import { base64, buildMessage, dotStuff, sendMail, type ConnectFn, type MailMessage } from "../src/smtp/smtp-client";
 import { fakeSmtp } from "./fake-smtp";
 
 const config: SmtpConfig = {
@@ -83,6 +83,15 @@ describe("sendMail", () => {
     await expect(sendMail(config, message, smtp.connect, 50)).rejects.toMatchObject({ code: "smtp_timeout", transient: true });
   });
 
+  it("times out when the server stops reading", async () => {
+    const stalled = (() => ({
+      readable: new ReadableStream({ start: (c) => c.enqueue(new TextEncoder().encode("220 ready\r\n")) }),
+      writable: new WritableStream({ write: () => new Promise(() => {}) }),
+      close: async () => {},
+    })) as unknown as ConnectFn;
+    await expect(sendMail(config, message, stalled, 50)).rejects.toMatchObject({ code: "smtp_timeout", transient: true });
+  });
+
   it("does not mark a missing reply after DATA as transient", async () => {
     const smtp = fakeSmtp({ ".": "SILENT" });
     await expect(sendMail(config, message, smtp.connect, 50)).rejects.toMatchObject({ code: "smtp_unconfirmed", transient: false });
@@ -111,6 +120,7 @@ describe("buildMessage", () => {
     const header = raw.slice(raw.indexOf("Subject: "), raw.indexOf("\r\nDate: "));
     const words = [...header.matchAll(/=\?UTF-8\?B\?([^?]*)\?=/g)].map((m) => m[0]);
     for (const word of words) expect(word.length).toBeLessThanOrEqual(75);
+    for (const line of header.split("\r\n")) expect(line.length).toBeLessThanOrEqual(76);
     const decoded = words
       .map((w) => new TextDecoder().decode(Uint8Array.from(atob(w.slice(10, -2)), (c) => c.charCodeAt(0))))
       .join("");

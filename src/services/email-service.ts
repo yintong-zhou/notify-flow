@@ -87,7 +87,7 @@ export async function sendTemplatedEmail(
       request.template,
       config.provider,
       request.to,
-      Number(env.RECIPIENT_LIMIT_PER_HOUR) || 5,
+      Number(env.RECIPIENT_LIMIT_PER_HOUR || 5),
     )
     .run();
   if (meta.changes === 0) {
@@ -109,10 +109,6 @@ export async function sendTemplatedEmail(
   for (let attempt = 1; ; attempt++) {
     try {
       await send(config, message);
-      await env.DB.prepare("UPDATE email_deliveries SET status = 'submitted', attempts = ?, sent_at = unixepoch() WHERE id = ?")
-        .bind(attempt, id)
-        .run();
-      return { id, status: "submitted" };
     } catch (e) {
       const smtp = e instanceof SmtpError ? e : null;
       if (smtp?.transient && attempt < MAX_ATTEMPTS) {
@@ -131,5 +127,10 @@ export async function sendTemplatedEmail(
           : "The SMTP server did not accept the message";
       throw new HttpError(502, "smtp_failed", message, { id });
     }
+    // Outside the try: the email is out, so a D1 error here must not mark the row failed (the caller could resend).
+    await env.DB.prepare("UPDATE email_deliveries SET status = 'submitted', attempts = ?, sent_at = unixepoch() WHERE id = ?")
+      .bind(attempt, id)
+      .run();
+    return { id, status: "submitted" };
   }
 }

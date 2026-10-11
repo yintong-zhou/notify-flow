@@ -49,14 +49,17 @@ const wrap76 = (value: string): string => value.match(/.{1,76}/g)?.join("\r\n") 
 const crlf = (value: string): string => value.replace(/\r?\n/g, "\r\n");
 const domainOf = (email: string): string => email.slice(email.lastIndexOf("@") + 1);
 
-/** RFC 2047 encoded words of at most 45 UTF-8 bytes (≤ 72 chars each), folded onto continuation lines. */
-function encodeWords(value: string): string {
+/**
+ * RFC 2047 encoded words of at most 45 UTF-8 bytes (≤ 72 chars each), folded onto continuation lines. `firstMax`
+ * shrinks the first word so it fits after the header name within 76 chars.
+ */
+function encodeWords(value: string, firstMax = 45): string {
   const words: string[] = [];
   let current = "";
   let size = 0;
   for (const char of value) {
     const n = encoder.encode(char).length;
-    if (size + n > 45) {
+    if (size + n > (words.length ? 45 : firstMax)) {
       words.push(current);
       current = "";
       size = 0;
@@ -79,7 +82,7 @@ export function buildMessage(msg: MailMessage, date = new Date()): string {
   return [
     `From: ${msg.fromName ? `${encodeWords(msg.fromName)} ` : ""}<${msg.from}>`,
     `To: <${msg.to}>`,
-    `Subject: ${encodeWords(msg.subject)}`,
+    `Subject: ${encodeWords(msg.subject, 39)}`, // 9 + 64 chars
     `Date: ${date.toUTCString()}`,
     `Message-ID: <${msg.messageId}>`,
     "MIME-Version: 1.0",
@@ -105,7 +108,7 @@ class Connection {
   }
 
   async write(data: string): Promise<void> {
-    await this.writer.write(encoder.encode(data));
+    await this.withTimeout(this.writer.write(encoder.encode(data)));
   }
 
   /** Sends `line` (null = just read, for the greeting) and checks the reply code. */

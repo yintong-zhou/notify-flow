@@ -55,7 +55,9 @@ export function parseTemplate(body: Record<string, unknown>): Template {
   return { subject, html, text, variables: [...declared] };
 }
 
-const EMAIL_RE = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
+// Printable ASCII without <>()[]\,;:@" and space: no CR/LF, a single recipient, nothing that needs quoting.
+const ATOM = "[\\w.!#$%&'*+/=?^`{|}~-]+";
+const EMAIL_RE = new RegExp(`^${ATOM}@${ATOM}\\.${ATOM}$`);
 
 export interface SendRequest {
   template: string;
@@ -68,7 +70,6 @@ export function parseSendRequest(body: Record<string, unknown>): SendRequest {
   const { template, to, variables } = body;
   const locale = body.locale ?? "en";
   if (typeof template !== "string" || !NAME_RE.test(template)) invalid("template must match ^[a-z0-9-]{1,64}$");
-  // \s covers CR/LF; the comma check keeps it to a single recipient.
   if (typeof to !== "string" || to.length > 254 || !EMAIL_RE.test(to)) invalid("to must be a single valid email address");
   if (!isLocale(locale)) invalid("locale must be one of it, en, pt-BR");
   if (

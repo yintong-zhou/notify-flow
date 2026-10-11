@@ -249,6 +249,40 @@ describe("POST /v1/email/send", () => {
     const res = await send(key, welcome("a@example.com"), recorder().send, { "Idempotency-Key": "k".repeat(256) });
     expect(res.status).toBe(400);
   });
+
+  it("rejects recipients with non-ASCII or special characters", async () => {
+    const { key } = await createClient();
+    for (const to of ["à@example.com", 'a"b@example.com', "a<b@example.com", "a(b@example.com", "a[b@example.com", "a\\b@example.com", "a;b@example.com", "a:b@example.com"]) {
+      expect((await send(key, welcome(to))).status, to).toBe(400);
+    }
+  });
+
+  it("applies RECIPIENT_LIMIT_PER_HOUR=0 as a limit of 0", async () => {
+    const { key } = await createClient();
+    const rec = recorder();
+    const res = await call("/v1/email/send", { key, method: "POST", body: welcome("zero@example.com") }, rec.send, {
+      ...env,
+      RECIPIENT_LIMIT_PER_HOUR: "0",
+    });
+    expect(res.status).toBe(429);
+    expect(rec.messages).toHaveLength(0);
+  });
+
+  it("never marks a sent email failed when recording the success fails", async () => {
+    const { id: clientId, key } = await createClient();
+    const rec = recorder();
+    const DB = {
+      prepare: (sql: string) =>
+        sql.includes("'submitted'")
+          ? { bind: () => ({ run: async () => Promise.reject(new Error("D1 down")) }) }
+          : env.DB.prepare(sql),
+    } as unknown as D1Database;
+    const res = await call("/v1/email/send", { key, method: "POST", body: welcome("d1@example.com") }, rec.send, { ...env, DB });
+    expect(res.status).toBe(500);
+    expect(rec.messages).toHaveLength(1);
+    const rowAfter = await env.DB.prepare("SELECT status FROM email_deliveries WHERE client_id = ?").bind(clientId).first<any>();
+    expect(rowAfter).toEqual({ status: "processing" });
+  });
 });
 
 describe("purgeDeliveries", () => {

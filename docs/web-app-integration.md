@@ -114,7 +114,7 @@ curl -X POST "$NOTIFY_FLOW_URL/v1/email/send" \
 
 Errors always have the shape `{"error":{"code":"…","message":"…"}}`.
 
-For asynchronous sending (`202 Accepted`, `GET /v1/email/:id`), see [Asynchronous sending](web-app-integration-async.md).
+For asynchronous sending (`202 Accepted`, `GET /v1/email/:id`), see [Asynchronous sending](web-app-integration-async.md). To send by event instead of by template name (`POST /v1/notifications`), see [Event-based sending](web-app-integration-events.md).
 
 ## Backend code examples
 

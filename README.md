@@ -119,6 +119,10 @@ How a send is handled:
 
 `GET /v1/email/:id` returns `{ "id", "status", "error_code" }` for one of your own sends; another client's id answers `404`. Statuses: `queued`, `processing`, `retrying`, `submitted`, `failed`.
 
+### Send an event
+
+`POST /v1/notifications` takes `{ "event": "auth.password_reset", "recipient": { "email": "…", "locale": "it" }, "data": { … } }` and sends the template mapped to the event, with the same responses, `Prefer` and `Idempotency-Key` behavior as `/v1/email/send`. Built-in events: `user.welcome`, `auth.email_verification`, `auth.password_reset`, `auth.password_changed`, `auth.login_alert`, `notification.generic`. Remap them or add your own with `GET`/`PUT`/`DELETE /v1/events/:event` ([guide](docs/web-app-integration-events.md)).
+
 ### Manage templates
 
 | Method and path | Purpose |
@@ -130,13 +134,7 @@ How a send is handled:
 
 Templates use `{{variable}}` placeholders, and every placeholder must be listed in `variables`. Values are HTML-escaped in `html`, and line breaks are stripped in `subject`.
 
-**Built-in templates:**
-- `welcome`
-- `verify-email`
-- `password-reset`
-- `password-changed`
-- `login-alert`
-- `generic-notification`
+**Built-in templates:** `welcome`, `verify-email`, `password-reset`, `password-changed`, `login-alert`, `generic-notification`.
 
 ## SMTP configuration
 
@@ -187,7 +185,6 @@ docs/              # web app integration guide, requirements parts, design spec
 
 These items come from the spec and are planned after the MVP:
 
-- Event-based `POST /v1/notifications` endpoint (for example `auth.password_reset`)
 - HMAC request signing (`X-Client-Id`, `X-Timestamp`, `X-Signature`)
 - OAuth2 / XOAUTH2 for Google Workspace and Microsoft 365
 - Encrypted per-tenant SMTP credentials stored in a database

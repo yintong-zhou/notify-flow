@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Requirements: `notification-service.md` (continues in `docs/requirements/`)
 - Design spec: `docs/superpowers/specs/2026-10-08-notification-service-mvp-design.md` (+ `-part2.md`)
-- Web app integration guide: `docs/web-app-integration.md` (+ `docs/web-app-integration-flows.md`)
+- Web app integration guide: `docs/web-app-integration.md` (+ `-flows.md`, `-async.md`, `-events.md`)
 
 Keep every Markdown file under 200 lines: split a longer one into linked parts, or tighten it.
 
@@ -33,6 +33,8 @@ A transactional email service running on Cloudflare Workers (TypeScript). It is 
 Request flow: `index.ts` (router) → `security/` (auth, client rate limit, validation) → `routes/` → `services/email-service.ts` (idempotency, recipient limit, retries, delivery log) → `templates/renderer.ts` → `smtp/smtp-client.ts` → SMTP server.
 
 Async (`Prefer: respond-async`): the route enqueues to `EMAIL_QUEUE` and answers `202 queued`; the same Worker's `queue()` handler (`services/queue-consumer.ts`) claims the row atomically (Queues deliver at least once), renders and sends once, then acks or retries (5 attempts). `GET /v1/email/:id` returns the status.
+
+Events (`POST /v1/notifications`): `routes/notifications.ts` resolves the event to a template name (the client's `event_routes` row, then `BUILTIN_EVENTS` in `templates/events.ts`) and calls the same `dispatch` as `/v1/email/send`; `/v1/events` manages the mappings.
 
 - **Templates only.** Callers choose a template and pass variables. They never send a subject or HTML. Templates come from D1 per client (`templates` table, managed via `/v1/templates`), with fallback to the built-ins in `templates/defaults.ts`, then to `en`. Variables must match the template's declared list exactly. This is a core anti-abuse guarantee, not a convenience.
 - **Generic SMTP client with presets.** `smtp-client.ts` implements EHLO, STARTTLS, AUTH PLAIN/LOGIN, MAIL FROM, RCPT TO, DATA, QUIT and the MIME message. The Gmail, Microsoft and generic presets live in `smtp/provider.ts`. The service layer must not depend on a specific provider.
@@ -50,4 +52,4 @@ Async (`Prefer: respond-async`): the route enqueues to `EMAIL_QUEUE` and answers
 
 ## Not in the MVP (spec roadmap)
 
-`POST /v1/notifications` with event-based routing, HMAC request signing (`X-Client-Id`, `X-Timestamp`, `X-Signature`), XOAUTH2, encrypted per-tenant SMTP credentials stored in a database, and Web Push.
+HMAC request signing (`X-Client-Id`, `X-Timestamp`, `X-Signature`), XOAUTH2, encrypted per-tenant SMTP credentials stored in a database, and Web Push.

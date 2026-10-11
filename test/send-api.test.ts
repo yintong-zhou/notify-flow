@@ -173,6 +173,19 @@ describe("POST /v1/email/send", () => {
     expect(rec.messages).toHaveLength(0);
   });
 
+  it("does not treat an old row claimed just now as abandoned", async () => {
+    const { id: clientId, key } = await createClient();
+    const to = `claimed-${crypto.randomUUID()}@example.com`;
+    await env.DB.prepare(
+      `INSERT INTO email_deliveries (id, request_id, client_id, idempotency_key, template, provider, recipient, status, created_at, claimed_at)
+       VALUES ('msg_claimed', 'r', ?, 'claimed-key', 'welcome', 'gmail', ?, 'processing', unixepoch() - 3600, unixepoch())`,
+    )
+      .bind(clientId, to)
+      .run();
+    const replay = await send(key, welcome(to), recorder().send, { "Idempotency-Key": "claimed-key" });
+    expect(await replay.json()).toEqual({ id: "msg_claimed", status: "processing" });
+  });
+
   it("retries a transient SMTP failure", async () => {
     const { key } = await createClient();
     const rec = recorder(new SmtpError("smtp_temporary_failure", true, "SMTP 451"));

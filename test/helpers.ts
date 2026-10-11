@@ -50,3 +50,13 @@ export function recorder(...failures: unknown[]): { send: SendMailFn; messages: 
     },
   };
 }
+
+/** A Queue that records sent bodies, or throws on send when `fail` is set. */
+export function fakeQueue(fail = false): { queue: Queue; sent: any[] } {
+  const sent: any[] = [];
+  const send = async (body: unknown) => {
+    if (fail) throw new Error("queue down");
+    sent.push(body);
+  };
+  return { queue: { send } as unknown as Queue, sent };
+}

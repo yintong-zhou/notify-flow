@@ -175,3 +175,31 @@ export async function sendTemplatedEmail(
     return { id, status: "submitted" };
   }
 }
+
+/** The queue message for an async send: what the consumer needs to render and send, never the rendered email. */
+export interface QueuedEmail extends SendRequest {
+  id: string;
+  clientId: string;
+}
+
+// Cloudflare caps a queue message at 128 KB; the margin covers id, clientId and JSON overhead.
+const MAX_QUEUED_BYTES = 120 * 1024;
+const encoder = new TextEncoder();
+
+export async function enqueueTemplatedEmail(env: Env, clientId: string, request: SendRequest, options: SendOptions): Promise<SendResult> {
+  if (encoder.encode(JSON.stringify(request)).byteLength > MAX_QUEUED_BYTES) {
+    throw new HttpError(413, "payload_too_large", "Variables are too large for an async send");
+  }
+  const reserved = await reserveDelivery(env, clientId, request, options, "queued");
+  if ("status" in reserved) return reserved;
+  const { id } = reserved;
+  try {
+    await env.EMAIL_QUEUE.send({ id, clientId, ...request } satisfies QueuedEmail, { contentType: "json" });
+  } catch {
+    // Failed rows don't count against the recipient limit, so the caller can simply retry.
+    await env.DB.prepare("UPDATE email_deliveries SET status = 'failed', error_code = 'enqueue_failed' WHERE id = ?").bind(id).run();
+    console.error(JSON.stringify({ id, client_id: clientId, error_code: "enqueue_failed" }));
+    throw new HttpError(503, "queue_unavailable", "The send queue is unavailable: retry later", { id });
+  }
+  return { id, status: "queued" };
+}

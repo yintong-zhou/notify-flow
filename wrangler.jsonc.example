@@ -41,6 +41,21 @@
     }
   ],
 
+  // Async sending (Prefer: respond-async): the API enqueues, this same Worker consumes and sends.
+  // Create the queue once before deploying: npx wrangler queues create notify-flow-emails
+  "queues": {
+    "producers": [{ "binding": "EMAIL_QUEUE", "queue": "notify-flow-emails" }], // binding used in code — do not change
+    "consumers": [
+      {
+        "queue": "notify-flow-emails",
+        "max_batch_size": 10,      // messages per consumer call: a few SMTP sessions at most
+        "max_batch_timeout": 5,    // seconds to wait for a fuller batch
+        "max_retries": 5,          // >= the 4 retries the consumer schedules, so the queue never drops a message first
+        "max_concurrency": 2       // parallel consumer calls: few SMTP sessions open on the provider
+      }
+    ]
+  },
+
   // Non-secret settings. Empty string = use the provider preset.
   "vars": {
     "SMTP_PROVIDER": "gmail",                // gmail | microsoft | generic

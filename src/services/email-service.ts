@@ -64,8 +64,24 @@ async function findReplay(db: D1Database, clientId: string, key: string | null):
 const RETENTION_S = 30 * 24 * 3600;
 const PURGE_BATCH = 1000;
 
-/** Deletes delivery rows older than RETENTION_S, in batches so one statement never holds the write lock for long. */
+// The queue keeps a message for 24 hours at most: an older queued or retrying row will never be sent.
+const STALE_QUEUED_S = 24 * 3600;
+
+async function closeStaleQueued(db: D1Database): Promise<void> {
+  await db
+    .prepare(
+      "UPDATE email_deliveries SET status = 'failed', error_code = 'abandoned' WHERE status IN ('queued', 'retrying') AND created_at < unixepoch() - ?",
+    )
+    .bind(STALE_QUEUED_S)
+    .run();
+}
+
+/**
+ * Closes stuck queued rows, then deletes delivery rows older than RETENTION_S, in batches so one statement never
+ * holds the write lock for long.
+ */
 export async function purgeDeliveries(db: D1Database): Promise<void> {
+  await closeStaleQueued(db);
   for (;;) {
     const { meta } = await db
       .prepare(

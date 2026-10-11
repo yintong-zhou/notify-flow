@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import type { QueuedEmail } from "../src/services/email-service";
+import { purgeDeliveries, type QueuedEmail } from "../src/services/email-service";
 import { handleQueue } from "../src/services/queue-consumer";
 import { SmtpError, type SendMailFn } from "../src/smtp/smtp-client";
 import { call, createClient, fakeQueue, recorder } from "./helpers";
@@ -260,5 +260,25 @@ describe("GET /v1/email/:id", () => {
     const fresh = await insert("unixepoch()");
     expect(await (await get(key, stale)).json()).toEqual({ id: stale, status: "failed", error_code: "abandoned" });
     expect(await (await get(key, fresh)).json()).toEqual({ id: fresh, status: "processing", error_code: null });
+  });
+});
+
+describe("purgeDeliveries and stuck queued rows", () => {
+  it("closes queued and retrying rows older than 24 hours and keeps recent ones", async () => {
+    const { id: clientId } = await createClient();
+    const ids: Record<string, string> = {};
+    for (const [name, status, age] of [["oldQueued", "queued", 90000], ["oldRetrying", "retrying", 90000], ["newQueued", "queued", 3600]] as const) {
+      ids[name] = `msg_${crypto.randomUUID()}`;
+      await env.DB.prepare(
+        `INSERT INTO email_deliveries (id, request_id, client_id, template, provider, recipient, status, created_at)
+         VALUES (?, 'r', ?, 'welcome', 'gmail', 'x@example.com', ?, unixepoch() - ?)`,
+      )
+        .bind(ids[name], clientId, status, age)
+        .run();
+    }
+    await purgeDeliveries(env.DB);
+    expect(await row(ids.oldQueued)).toMatchObject({ status: "failed", error_code: "abandoned" });
+    expect(await row(ids.oldRetrying)).toMatchObject({ status: "failed", error_code: "abandoned" });
+    expect(await row(ids.newQueued)).toMatchObject({ status: "queued", error_code: null });
   });
 });

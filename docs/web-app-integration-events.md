@@ -36,6 +36,7 @@ The same as `/v1/email/send`:
 - **Async:** `202 queued` with `Prefer: respond-async` ([async guide](web-app-integration-async.md)).
 - **Status:** read it with `GET /v1/email/:id`.
 - **Shared with `/v1/email/send`:** `Idempotency-Key`s and the per-recipient limit. A key used on one endpoint replays its result on the other, and both count towards the same template's hourly limit.
+- **Replays after a mapping change:** the event is resolved before the replay lookup. If the event was deleted or remapped to a template with different variables since the first request, a retry with the same key answers `404 event_not_found` or `400 invalid_variables` instead of the stored result. Nothing is ever sent twice.
 
 ## Built-in events
 
@@ -76,9 +77,11 @@ curl -X PUT "$NOTIFY_FLOW_URL/v1/events/auth.password_reset" \
 
 | HTTP status | `error.code` | What to do |
 | --- | --- | --- |
-| 400 | `validation_error` | Fix the payload: event name, `recipient`, `data` |
+| 400 | `validation_error` | Fix the payload: event name, `recipient`, `data`, or the `Idempotency-Key` |
+| 400 | `invalid_json` | The body is not a JSON object |
 | 400 | `invalid_variables` | `data` does not match the template's variables |
 | 404 | `event_not_found` | No mapping of yours and no built-in for this event |
 | 404 | `template_not_found` | On `PUT`: the template doesn't exist. On send: the mapped template exists neither in that locale nor in `en` |
+| 405 | `method_not_allowed` | `/v1/notifications` takes only `POST`; `/v1/events` only `GET`; `/v1/events/:event` `GET`, `PUT` or `DELETE` |
 
 All other errors (`401`, `413`, `429`, `5xx`) are the same as for [`/v1/email/send`](web-app-integration.md#sending-an-email).

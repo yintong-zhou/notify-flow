@@ -169,10 +169,10 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 ```text
 src/
 ├── index.ts       # Worker entry point and router
-├── routes/        # email, templates, health
+├── routes/        # email, notifications, events, templates, health
 ├── security/      # auth, payload validation, rate limiting
 ├── services/      # email-service (idempotency, retries, delivery log), queue-consumer (async sends)
-├── templates/     # renderer + built-in defaults
+├── templates/     # renderer, built-in defaults, built-in events
 ├── smtp/          # SMTP client + provider presets
 └── types/
 migrations/        # D1 schema

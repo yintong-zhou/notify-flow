@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run db:migrate:local` / `db:migrate:remote`
 - `npm run client:create -- <name> [--remote]` — creates a client, prints its API key once
 
-**Testing note:** `vi.mock` does not intercept modules in the Workers pool. Inject dependencies instead (`handle(req, env, send)`, `sendMail(config, msg, connectFn, timeoutMs)`); `test/helpers.ts` has `call()` and `recorder()`, and `test/fake-smtp.ts` is a scripted SMTP server.
+**Testing note:** `vi.mock` does not intercept modules in the Workers pool. Inject dependencies instead (`handle(req, env, send)`, `sendMail(config, msg, connectFn, timeoutMs)`, `handleQueue(batch, env, send)`); `test/helpers.ts` has `call()`, `recorder()` and `fakeQueue()` (always inject it for async tests: the real binding would reach real SMTP), and `test/fake-smtp.ts` is a scripted SMTP server.
 
 ## Docs
 
@@ -32,6 +32,8 @@ A transactional email service running on Cloudflare Workers (TypeScript). It is 
 
 Request flow: `index.ts` (router) → `security/` (auth, client rate limit, validation) → `routes/` → `services/email-service.ts` (idempotency, recipient limit, retries, delivery log) → `templates/renderer.ts` → `smtp/smtp-client.ts` → SMTP server.
 
+Async (`Prefer: respond-async`): the route enqueues to `EMAIL_QUEUE` and answers `202 queued`; the same Worker's `queue()` handler (`services/queue-consumer.ts`) claims the row atomically (Queues deliver at least once), renders and sends once, then acks or retries (5 attempts). `GET /v1/email/:id` returns the status.
+
 - **Templates only.** Callers choose a template and pass variables. They never send a subject or HTML. Templates come from D1 per client (`templates` table, managed via `/v1/templates`), with fallback to the built-ins in `templates/defaults.ts`, then to `en`. Variables must match the template's declared list exactly. This is a core anti-abuse guarantee, not a convenience.
 - **Generic SMTP client with presets.** `smtp-client.ts` implements EHLO, STARTTLS, AUTH PLAIN/LOGIN, MAIL FROM, RCPT TO, DATA, QUIT and the MIME message. The Gmail, Microsoft and generic presets live in `smtp/provider.ts`. The service layer must not depend on a specific provider.
 - **Raw TCP.** On Workers, use `connect()` from `cloudflare:sockets`. For STARTTLS, use `secureTransport: "starttls"` together with `socket.startTls()`. Outbound port 25 is blocked on Workers.
@@ -48,4 +50,4 @@ Request flow: `index.ts` (router) → `security/` (auth, client rate limit, vali
 
 ## Not in the MVP (spec roadmap)
 
-Cloudflare Queues (API Worker → Queue → Email Worker, returning `202` with `queued`), `POST /v1/notifications` with event-based routing, HMAC request signing (`X-Client-Id`, `X-Timestamp`, `X-Signature`), XOAUTH2, encrypted per-tenant SMTP credentials stored in a database, and Web Push.
+`POST /v1/notifications` with event-based routing, HMAC request signing (`X-Client-Id`, `X-Timestamp`, `X-Signature`), XOAUTH2, encrypted per-tenant SMTP credentials stored in a database, and Web Push.

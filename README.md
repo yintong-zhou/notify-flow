@@ -50,6 +50,7 @@ To deploy:
 ```bash
 npx wrangler d1 create notify-flow       # copy the database_id into wrangler.jsonc
 npm run db:migrate:remote
+npx wrangler queues create notify-flow-emails
 npx wrangler secret put SMTP_USERNAME    # repeat for SMTP_PASSWORD, SMTP_FROM_EMAIL, SMTP_FROM_NAME
 npm run deploy
 npm run client:create -- my-app --remote
@@ -116,6 +117,7 @@ How a send is handled:
 - **Locale:** `locale` is optional and defaults to `en`. When a template is missing in the requested locale, `en` is used.
 - **Idempotency:** a repeated `Idempotency-Key` returns the original `{ id, status }` and sends nothing.
 - **Failures:** if the SMTP server refuses the message, the response is `502 smtp_failed`, and it includes the `id`.
+- **Async:** add `Prefer: respond-async` to get `202` with `queued`, then read the outcome with `GET /v1/email/:id` ([guide](docs/web-app-integration-async.md)).
 
 > [!NOTE]
 > `submitted` means the SMTP server accepted the message. It does not mean the message reached the inbox, which is why there is no `delivered` status.
@@ -188,7 +190,6 @@ docs/              # web app integration guide, requirements parts, design spec
 
 These items come from the spec and are planned after the MVP:
 
-- Asynchronous sending with Cloudflare Queues (`202 Accepted` with status `queued`)
 - Event-based `POST /v1/notifications` endpoint (for example `auth.password_reset`)
 - HMAC request signing (`X-Client-Id`, `X-Timestamp`, `X-Signature`)
 - OAuth2 / XOAUTH2 for Google Workspace and Microsoft 365

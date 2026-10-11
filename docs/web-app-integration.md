@@ -114,6 +114,8 @@ curl -X POST "$NOTIFY_FLOW_URL/v1/email/send" \
 
 Errors always have the shape `{"error":{"code":"…","message":"…"}}`.
 
+For asynchronous sending (`202 Accepted`, `GET /v1/email/:id`), see [Asynchronous sending](web-app-integration-async.md).
+
 ## Backend code examples
 
 All you need is one function that makes the `POST` and turns errors into exceptions. No library required: `fetch` in Node 18+, `requests` in Python.

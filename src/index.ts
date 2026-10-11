@@ -3,7 +3,8 @@ import { health } from "./routes/health";
 import { deleteTemplate, getTemplate, listTemplates, putTemplate } from "./routes/templates";
 import { authenticate } from "./security/auth";
 import { checkClientLimit, checkIpLimit } from "./security/rate-limit";
-import { purgeDeliveries } from "./services/email-service";
+import { purgeDeliveries, type QueuedEmail } from "./services/email-service";
+import { handleQueue } from "./services/queue-consumer";
 import { sendMail, type SendMailFn } from "./smtp/smtp-client";
 import { HttpError } from "./types";
 
@@ -67,4 +68,5 @@ function errorResponse(e: unknown): Response {
 export default {
   fetch: (req, env, ctx) => handle(req, env, sendMail, ctx),
   scheduled: (_controller, env, ctx) => ctx.waitUntil(purgeDeliveries(env.DB)),
-} satisfies ExportedHandler<Env>;
+  queue: (batch, env) => handleQueue(batch, env, sendMail),
+} satisfies ExportedHandler<Env, QueuedEmail>;

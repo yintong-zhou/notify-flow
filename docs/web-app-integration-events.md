@@ -22,12 +22,7 @@ curl -X POST "$NOTIFY_FLOW_URL/v1/notifications" \
   }'
 ```
 
-| Field | Required | Rules |
-| --- | --- | --- |
-| `event` | yes | At most 64 characters, `namespace.action` (lowercase letters, digits, `_`, at least one dot) |
-| `recipient.email` | yes | A single address, as `to` in `/v1/email/send` |
-| `recipient.locale` | no | `it`, `en` or `pt-BR`. Default: `en` |
-| `data` | yes | An object of strings, with exactly the variables the resolved template declares |
+Field rules: [`POST /v1/notifications`](api-reference-email.md#post-v1-notifications).
 
 ## Response
 
@@ -40,16 +35,7 @@ The same as `/v1/email/send`:
 
 ## Built-in events
 
-| Event | Template | `data` keys |
-| --- | --- | --- |
-| `user.welcome` | `welcome` | `appName`, `name` |
-| `auth.email_verification` | `verify-email` | `appName`, `name`, `verifyUrl` |
-| `auth.password_reset` | `password-reset` | `appName`, `name`, `resetUrl` |
-| `auth.password_changed` | `password-changed` | `appName`, `name` |
-| `auth.login_alert` | `login-alert` | `appName`, `name`, `device`, `ipAddress`, `time` |
-| `notification.generic` | `generic-notification` | `appName`, `title`, `message` |
-
-If you override a built-in template with your own version, its `data` keys become the variables your version declares.
+Six events work out of the box (`user.welcome`, `auth.password_reset` and others), each mapped to a built-in template. The list, with each event's `data` keys, is in [Built-in events](api-reference-email.md#built-in-events).
 
 ## Managing mappings
 
@@ -62,12 +48,7 @@ curl -X PUT "$NOTIFY_FLOW_URL/v1/events/auth.password_reset" \
   -d '{"template":"my-reset"}'
 ```
 
-| Method and path | Purpose |
-| --- | --- |
-| `GET /v1/events` | Your mappings plus the built-ins you have not overridden (`builtin: true`) |
-| `GET /v1/events/:event` | One mapping: `{event, template, builtin}` |
-| `PUT /v1/events/:event` | Create or replace a mapping: `{template}` |
-| `DELETE /v1/events/:event` | Delete your mapping. A built-in event goes back to its default; built-ins themselves can't be deleted |
+The routes (`GET /v1/events`, `GET`/`PUT`/`DELETE /v1/events/:event`) are described in [Events, templates and health](api-reference-config.md).
 
 - **Template check:** `PUT` requires the template to exist (yours in any locale, or a built-in), so a typo is caught right away.
 - **Deleting a template** does not delete the mappings that point to it. Sends to those events then answer `404 template_not_found`.
@@ -75,13 +56,4 @@ curl -X PUT "$NOTIFY_FLOW_URL/v1/events/auth.password_reset" \
 
 ## Errors
 
-| HTTP status | `error.code` | What to do |
-| --- | --- | --- |
-| 400 | `validation_error` | Fix the payload: event name, `recipient`, `data`, or the `Idempotency-Key` |
-| 400 | `invalid_json` | The body is not a JSON object |
-| 400 | `invalid_variables` | `data` does not match the template's variables |
-| 404 | `event_not_found` | No mapping of yours and no built-in for this event |
-| 404 | `template_not_found` | On `PUT`: the template doesn't exist. On send: the mapped template exists neither in that locale nor in `en` |
-| 405 | `method_not_allowed` | `/v1/notifications` takes only `POST`; `/v1/events` only `GET`; `/v1/events/:event` `GET`, `PUT` or `DELETE` |
-
-All other errors (`401`, `413`, `429`, `5xx`) are the same as for [`/v1/email/send`](web-app-integration.md#sending-an-email).
+Besides the errors of `/v1/email/send`, an event can answer `404 event_not_found` (no mapping of yours and no built-in). Every code is in [Errors](api-reference.md#errors).

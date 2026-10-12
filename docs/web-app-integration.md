@@ -90,29 +90,9 @@ curl -X POST "$NOTIFY_FLOW_URL/v1/email/send" \
   }'
 ```
 
-| Field | Required | Rules |
-| --- | --- | --- |
-| `template` | yes | Template name: lowercase letters, digits and hyphens, at most 64 characters |
-| `to` | yes | A single address, at most 254 characters, no commas or line breaks |
-| `locale` | no | `it`, `en` or `pt-BR`. Default: `en` |
-| `variables` | yes | An object of strings only, with exactly the variables the template declares |
-| `Authorization` header | yes | `Bearer <key>`, or the `X-API-Key: <key>` header instead |
-| `Idempotency-Key` header | recommended | 1 to 255 characters, unique per user action |
-
 `submitted` means the SMTP server accepted the message, not that it reached the recipient's inbox.
 
-| HTTP status | `error.code` | What to do |
-| --- | --- | --- |
-| 200 | — | Sent, or a replayed answer for the same `Idempotency-Key` |
-| 400 | `validation_error`, `invalid_json`, `invalid_variables` | Fix the payload: retrying won't help |
-| 401 | `unauthorized` | Missing or wrong key: check your configuration |
-| 404 | `template_not_found` | The template exists neither in that locale nor in `en` |
-| 413 | `payload_too_large` | The body is over 256 KB |
-| 429 | `rate_limited` | Too many requests: retry later |
-| 500 | `smtp_misconfigured`, `internal_error` | A problem on the service side: tell the administrator |
-| 502 | `smtp_failed` | The SMTP server refused the message after retries, or never confirmed it (the message then says it may still be delivered). The response includes the delivery `id` |
-
-Errors always have the shape `{"error":{"code":"…","message":"…"}}`.
+Field rules and every error code: [API Reference](api-reference-email.md#post-v1-email-send). What to retry: [Errors, retries and idempotency](web-app-integration-flows.md#errors-retries-and-idempotency).
 
 For asynchronous sending (`202 Accepted`, `GET /v1/email/:id`), see [Asynchronous sending](web-app-integration-async.md). To send by event instead of by template name (`POST /v1/notifications`), see [Event-based sending](web-app-integration-events.md).
 

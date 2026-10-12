@@ -80,13 +80,11 @@ A web app sends email in three steps:
 2. **Call the API from the backend.** Send `POST /v1/email/send` with a template, a recipient and the template's variables, or `POST /v1/notifications` with an event instead of a template. The frontend never calls notify-flow.
 3. **Handle the result.** Retry network errors, `429` and `500` with the same `Idempotency-Key`. Treat `4xx` as integration bugs.
 
-The **[web app integration guide](docs/web-app-integration.md)** covers the details: architecture, the full request and error reference, Node.js and Python clients, password reset and sign-up flows, custom templates, retry rules, [asynchronous sending](docs/web-app-integration-async.md) and a production checklist.
+The **[web app integration guide](docs/web-app-integration.md)** covers the details: architecture, Node.js and Python clients, password reset and sign-up flows, custom templates, retry rules, [asynchronous sending](docs/web-app-integration-async.md) and a production checklist.
 
 ## API
 
-Every `/v1/*` route needs an API key, sent as `Authorization: Bearer <key>` or `X-API-Key: <key>`. Errors always have the shape `{ "error": { "code", "message" } }`.
-
-### Send an email
+Every `/v1/*` route needs an API key, sent as `Authorization: Bearer <key>` or `X-API-Key: <key>`. A send is one call:
 
 ```http
 POST /v1/email/send
@@ -110,37 +108,7 @@ Content-Type: application/json
 { "id": "msg_…", "status": "submitted" }
 ```
 
-How a send is handled:
-
-- **Variables:** they must match the template's declared variables exactly. A missing or extra variable returns `400 invalid_variables`.
-- **Locale:** `locale` is optional and defaults to `en`. When a template is missing in the requested locale, `en` is used.
-- **Idempotency:** a repeated `Idempotency-Key` returns the original `{ id, status }` and sends nothing.
-- **Failures:** if the SMTP server refuses the message, the response is `502 smtp_failed`, and it includes the `id`.
-- **Async:** add `Prefer: respond-async` to get `202` with `queued`, then read the outcome with `GET /v1/email/:id` ([guide](docs/web-app-integration-async.md)).
-
-> [!NOTE]
-> `submitted` means the SMTP server accepted the message. It does not mean the message reached the inbox, which is why there is no `delivered` status.
-
-### Check a delivery
-
-`GET /v1/email/:id` returns `{ "id", "status", "error_code" }` for one of your own sends; another client's id answers `404`. Statuses: `queued`, `processing`, `retrying`, `submitted`, `failed`.
-
-### Send an event
-
-`POST /v1/notifications` takes `{ "event": "auth.password_reset", "recipient": { "email": "…", "locale": "it" }, "data": { … } }` and sends the template mapped to the event, with the same responses, `Prefer` and `Idempotency-Key` behavior as `/v1/email/send`. Built-in events: `user.welcome`, `auth.email_verification`, `auth.password_reset`, `auth.password_changed`, `auth.login_alert`, `notification.generic`. Remap them or add your own with `GET`/`PUT`/`DELETE /v1/events/:event` ([guide](docs/web-app-integration-events.md)).
-
-### Manage templates
-
-| Method and path | Purpose |
-|---|---|
-| `GET /v1/templates` | List your templates plus the built-in ones (marked `builtin: true`) |
-| `GET /v1/templates/:name/:locale` | Read one template (yours, otherwise the built-in) |
-| `PUT /v1/templates/:name/:locale` | Create or update a template: `{ subject, html, text, variables }` |
-| `DELETE /v1/templates/:name/:locale` | Delete one of your templates (built-ins can't be deleted) |
-
-Templates use `{{variable}}` placeholders, and every placeholder must be listed in `variables`. Values are HTML-escaped in `html`, and line breaks are stripped in `subject`.
-
-**Built-in templates:** `welcome`, `verify-email`, `password-reset`, `password-changed`, `login-alert`, `generic-notification`.
+The **[API Reference](docs/api-reference.md)** documents every endpoint, field rule, error code and status: [sending](docs/api-reference-email.md), and [events, templates and health](docs/api-reference-config.md).
 
 ## SMTP configuration
 

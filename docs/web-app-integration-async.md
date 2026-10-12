@@ -43,28 +43,11 @@ Validation, the template check, idempotency and the per-recipient limit all run 
 - **Unknown ids:** an unknown id, or an id that belongs to another app, answers `404 not_found`.
 - **Rate limit:** polling counts against the same per-client limit (60 requests per minute), so poll only when you need the answer, for example when the user opens a "resend email" page.
 
-| `status` | Meaning |
-| --- | --- |
-| `queued` | Accepted, waiting for its first attempt |
-| `processing` | An SMTP attempt is running |
-| `retrying` | A temporary failure: the next attempt comes after 1, 5, 15 or 30 minutes |
-| `submitted` | The SMTP server accepted the message (not proof of inbox delivery) |
-| `failed` | Final. `error_code` says why |
-
-| `error_code` | Meaning |
-| --- | --- |
-| `smtp_rejected`, `smtp_auth_failed` | The SMTP server refused the message or the credentials |
-| `smtp_timeout`, `smtp_temporary_failure`, `smtp_connection_failed` | All 5 attempts hit a temporary failure |
-| `smtp_unconfirmed` | The server never confirmed the message: it may still be delivered, so it is not retried |
-| `template_not_found`, `invalid_variables` | The template was deleted or changed after the request |
-| `abandoned` | The send was interrupted, or a request that got `503` was never retried and expired after 24 hours. The email may or may not have gone out |
+The meaning of every `status` and `error_code` is in [Delivery statuses](api-reference.md#delivery-statuses).
 
 ## New errors
 
-| HTTP status | `error.code` | What to do |
-| --- | --- | --- |
-| 413 | `payload_too_large` | The variables are over 120 KB, the queue's limit: shorten them or send synchronously |
-| 503 | `queue_unavailable` | The message may not have reached the queue; the delivery stays `queued`. Retry later with the **same** `Idempotency-Key`: the retry enqueues it again, and the service never sends it twice |
+Async adds two errors: `413 payload_too_large` when the variables are over 120 KB, the queue's limit (shorten them or send synchronously), and `503 queue_unavailable` when the message may not have reached the queue (retry later with the **same** `Idempotency-Key`: the service never sends it twice). See [Errors](api-reference.md#errors).
 
 ## Good to know
 

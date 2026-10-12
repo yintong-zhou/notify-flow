@@ -1,5 +1,7 @@
 # AI integration prompt
 
+<!-- Maintainers: the "API contract" below copies docs/api-reference*.md on purpose (the prompt must be self-contained); update both together. -->
+
 Paste the prompt below into a coding agent (Claude Code, Codex, Antigravity…) opened on your app's repository. The agent analyses the app, shows a plan, wires notify-flow into the backend, writes tests and, if needed, walks you through deploying notify-flow. You only do the interactive steps (Cloudflare login, secrets, API key), so credentials never end up in the conversation. For the manual route, see the [web app integration guide](web-app-integration.md).
 
 ````markdown

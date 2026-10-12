@@ -16,6 +16,7 @@ export default defineConfig({
     nav: [
       { text: "Home", link: "/" },
       { text: "Documentation", link: "/getting-started", activeMatch: "^/(getting-started|web-app-integration|ai-integration)" },
+      { text: "API Reference", link: "/api-reference", activeMatch: "^/api-reference" },
     ],
     sidebar: [
       {
@@ -32,6 +33,14 @@ export default defineConfig({
             ],
           },
           { text: "AI integration prompt", link: "/ai-integration-prompt" },
+        ],
+      },
+      {
+        text: "API Reference",
+        items: [
+          { text: "Overview", link: "/api-reference" },
+          { text: "Sending", link: "/api-reference-email" },
+          { text: "Events and templates", link: "/api-reference-config" },
         ],
       },
     ],

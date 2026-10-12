@@ -53,6 +53,7 @@ Send `Idempotency-Key: <key>` on `POST /v1/email/send` and `POST /v1/notificatio
 - **Format:** 1 to 255 characters, checked before the body is read (`400 validation_error`).
 - **Scope:** per client, shared by both send endpoints: a key used on one replays its result on the other.
 - **Replay:** the same key returns the stored `{ "id", "status" }` without sending, with `200` (or `202` when async), even when `status` is `failed`. Replays are answered before the per-recipient limit.
+- **Checked first:** the request is validated, and the template and its variables are checked before the replay lookup. If the template was deleted or its variables changed since the first request, a retry answers that error (`404 template_not_found`, `400 invalid_variables`) instead of the stored result; a broken SMTP configuration answers `500 smtp_misconfigured`. Nothing is ever sent twice.
 - **Interrupted send:** a replay of a delivery that has been `processing` for more than 5 minutes closes it as `failed` with `error_code: "abandoned"`. The email may have gone out anyway.
 - **No key:** every call sends an email.
 
@@ -99,7 +100,7 @@ Every error has the same shape:
 | 429 | `rate_limited` | One of the [rate limits](#rate-limits) |
 | 500 | `smtp_misconfigured` | The SMTP vars or secrets are missing or invalid: tell the administrator |
 | 500 | `internal_error` | An unexpected error |
-| 502 | `smtp_failed` | The SMTP server refused the message after 3 attempts (0.5 s and 1 s apart), or never confirmed it: the message then says it may still be delivered. Carries `id` |
+| 502 | `smtp_failed` | The SMTP server refused the message, or never confirmed it (the message then says it may still be delivered). Temporary failures are retried, up to 3 attempts 0.5 s and 1 s apart; permanent refusals fail at once. Carries `id` |
 | 503 | `queue_unavailable` | Async only: the message may not have reached the queue. Carries `id`; retry with the same `Idempotency-Key` |
 
 ## Delivery statuses

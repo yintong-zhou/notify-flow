@@ -11,7 +11,7 @@ Sends an email from a template, now or (with `Prefer: respond-async`) through th
 | Field | Required | Rule |
 |---|---|---|
 | `template` | yes | `^[a-z0-9-]{1,64}$` |
-| `to` | yes | One address, at most 254 characters. No spaces, commas, line breaks or `<>()[]\;:@"` outside the single `@`, and a dot in the domain. Stored lowercased |
+| `to` | yes | One address, at most 254 characters, printable ASCII only (no accented or IDN addresses). No spaces, commas, line breaks or `<>()[]\;:@"` outside the single `@`, and a dot in the domain. Stored lowercased |
 | `locale` | no | `it`, `en` or `pt-BR`. Default `en` |
 | `variables` | yes | An object of strings whose keys are exactly the template's declared variables |
 
@@ -88,7 +88,7 @@ Sends the template mapped to an event. After resolving the event it behaves exac
 
 **Resolution:** your mapping (see [events](api-reference-config.md#get-v1-events)), otherwise the built-in. Neither → `404 event_not_found`.
 
-**Replays after a mapping change:** the event is resolved before the replay lookup. If the event was deleted or remapped to a template with different variables since the first request, a retry with the same key answers `404 event_not_found` or `400 invalid_variables` instead of the stored result. Nothing is ever sent twice.
+**Replays after a mapping change:** the event is resolved before the replay lookup, like the template checks described in [Idempotency](api-reference.md#idempotency). If the event was deleted or remapped to a template with different variables since the first request, a retry with the same key answers `404 event_not_found` or `400 invalid_variables` instead of the stored result. Nothing is ever sent twice.
 
 **Errors:** those of `/v1/email/send`, plus `404 event_not_found`.
 

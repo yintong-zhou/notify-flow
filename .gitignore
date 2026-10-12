@@ -3,3 +3,5 @@ node_modules/
 .dev.vars
 worker-configuration.d.ts
 wrangler.jsonc
+docs/.vitepress/dist/
+docs/.vitepress/cache/

@@ -10,15 +10,18 @@ A self-hosted transactional email service for Cloudflare Workers. Your backends 
 
 ## Why
 
+<!-- #region why -->
 Every app ends up sending the same emails: welcome, email verification, password reset, login alerts. notify-flow keeps those emails in one place:
 
 - **One integration.** Apps call a REST endpoint instead of each embedding its own SMTP logic and credentials.
 - **Templates, not raw HTML.** Callers pick a template and pass variables. They can't send an arbitrary subject or body, which closes off spam and impersonation.
 - **Your own templates.** Each client can register its own templates, or override the built-in ones, in `it`, `en` and `pt-BR`.
 - **Any SMTP provider.** Gmail and Microsoft 365 are configuration presets on top of a generic SMTP client, not hard dependencies.
+<!-- #endregion why -->
 
 ## How it works
 
+<!-- #region how-it-works -->
 ```text
 Frontend ──► Your backend ──► notify-flow (Worker) ──► SMTP server ──► Recipient
                  │                  │
@@ -31,9 +34,11 @@ Frontend ──► Your backend ──► notify-flow (Worker) ──► SMTP se
 ```
 
 notify-flow only delivers mail. Security logic such as generating reset tokens stays in your backend.
+<!-- #endregion how-it-works -->
 
 ## Getting started
 
+<!-- #region getting-started -->
 You need Node.js 20+ and a Cloudflare account.
 
 ```bash
@@ -65,6 +70,7 @@ For development:
 npm test                                 # vitest inside workerd, with a local D1
 npm run typecheck                        # regenerates worker types, then tsc
 ```
+<!-- #endregion getting-started -->
 
 ## Integrate it into your web app
 
@@ -138,6 +144,7 @@ Templates use `{{variable}}` placeholders, and every placeholder must be listed 
 
 ## SMTP configuration
 
+<!-- #region smtp-configuration -->
 Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com/workers/configuration/secrets/), never in the repository or in code.
 
 | Name | Where | Value |
@@ -156,13 +163,16 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 
 > [!WARNING]
 > Microsoft 365 requires SMTP AUTH to be enabled on the sending mailbox, and Security Defaults block it. Microsoft is also retiring basic authentication for SMTP AUTH. If you use this preset, plan for OAuth2 (XOAUTH2 is on the roadmap).
+<!-- #endregion smtp-configuration -->
 
 ## Security
 
+<!-- #region security -->
 - **Per-client API keys**, stored only as SHA-256 hashes.
 - **Idempotency:** retrying a request with the same `Idempotency-Key` never sends a duplicate email.
 - **Rate limits:** 300 requests per minute per IP (checked before the API key), 60 per minute per client, and `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template for each client. Failed sends do not count.
 - **No secrets in logs:** delivery records and logs never contain variables, tokens, reset URLs or SMTP credentials.
+<!-- #endregion security -->
 
 ## Project structure
 

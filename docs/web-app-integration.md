@@ -1,6 +1,6 @@
 # Integrating notify-flow into a web app
 
-This guide shows how a web app's backend sends transactional emails through notify-flow. To set up and deploy the service itself, see the [README](../README.md). Part 2 covers [flows, templates, retries and production](web-app-integration-flows.md).
+This guide shows how a web app's backend sends transactional emails through notify-flow. To set up and deploy the service itself, see [Getting started](getting-started.md). Part 2 covers [flows, templates, retries and production](web-app-integration-flows.md).
 
 ## Overview
 

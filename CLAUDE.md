@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run dev` / `npm run deploy`
 - `npm run db:migrate:local` / `db:migrate:remote`
 - `npm run client:create -- <name> [--remote]` — creates a client, prints its API key once
+- `npm run docs:dev` / `docs:build` / `docs:preview` — VitePress site from `docs/` (build fails on dead links)
 
 **Testing note:** `vi.mock` does not intercept modules in the Workers pool. Inject dependencies instead (`handle(req, env, send)`, `sendMail(config, msg, connectFn, timeoutMs)`, `handleQueue(batch, env, send)`); `test/helpers.ts` has `call()`, `recorder()` and `fakeQueue()` (always inject it for async tests: the real binding would reach real SMTP), and `test/fake-smtp.ts` is a scripted SMTP server.
 
@@ -19,6 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Requirements: `notification-service.md` (continues in `docs/requirements/`)
 - Design spec: `docs/superpowers/specs/2026-10-08-notification-service-mvp-design.md` (+ `-part2.md`)
 - Web app integration guide: `docs/web-app-integration.md` (+ `-flows.md`, `-async.md`, `-events.md`)
+- Site: `docs/index.md`, `docs/getting-started.md` (include README regions `<!-- #region … -->`: keep relative links out of them); API contract: `docs/api-reference*.md` (`docs/ai-integration-prompt.md` keeps a copy, update both)
 
 Keep every Markdown file under 200 lines: split a longer one into linked parts, or tighten it.
 

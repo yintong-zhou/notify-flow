@@ -156,8 +156,28 @@ src/
 migrations/        # D1 schema
 scripts/           # create-client.mjs
 test/              # vitest, runs inside workerd
-docs/              # web app integration guide, requirements parts, design spec
+docs/              # docs site (VitePress): guides, API Reference; specs and plans are not published
 ```
+
+## Docs site
+
+The `docs/` folder doubles as a [VitePress](https://vitepress.dev) site: Home, Documentation and API Reference, built from these Markdown files (specs, plans and handoffs are not published).
+
+```bash
+npm run docs:dev                         # local site with hot reload
+npm run docs:build                       # static build in docs/.vitepress/dist; fails on dead links
+npm run docs:preview                     # serve the build
+```
+
+To publish it, connect the repository to [Cloudflare Pages](https://developers.cloudflare.com/pages/configuration/git-integration/) with these settings:
+
+| Setting | Value |
+|---|---|
+| Project name | `notify-flow-docs` |
+| Production branch | `main` |
+| Build command | `npm run docs:build` |
+| Build output directory | `docs/.vitepress/dist` |
+| Environment variable | `NODE_VERSION=22` |
 
 ## Roadmap
 

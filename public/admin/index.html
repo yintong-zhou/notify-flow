@@ -71,6 +71,24 @@
     </div>
     <button id="more" type="button" hidden>Load more</button>
 
+    <h2 id="logs-title">Logs</h2>
+    <form id="log-search" class="search">
+      <select name="level" aria-label="Level">
+        <option value="">Any level</option><option>error</option><option>warn</option><option>info</option>
+      </select>
+      <input name="code" placeholder="Code" aria-label="Code">
+      <input name="client_id" placeholder="Client id" aria-label="Client id">
+      <input name="ip" placeholder="IP" aria-label="IP">
+      <input name="message_id" placeholder="msg_…" aria-label="Message id">
+      <button>Search</button>
+      <p class="error" role="alert"></p>
+    </form>
+    <div class="scroll">
+      <table id="logs"><thead><tr><th>Time</th><th>Level</th><th>Code</th><th>Status</th><th>Request</th><th>Client</th>
+        <th>Message</th><th>IP</th><th>Detail</th></tr></thead><tbody></tbody></table>
+    </div>
+    <button id="more-logs" type="button" hidden>Load more</button>
+
     <h2>Account</h2>
     <form id="password-form" class="box">
       <label>Current password <input name="current" type="password" required autocomplete="current-password"></label>

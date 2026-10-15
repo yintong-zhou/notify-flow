@@ -10,6 +10,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
 
+  // Admin dashboard pages (public/admin/), served without running the Worker.
+  // /v1/*, /health and /admin/api/* match no file, so they still reach the Worker.
+  "assets": { "directory": "./public" },
+
   // D1 database holding clients, templates and the delivery log.
   "d1_databases": [
     {

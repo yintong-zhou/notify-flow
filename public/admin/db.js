@@ -28,6 +28,14 @@ function renderResult({ columns, rows, truncated, meta }, shown = rows) {
   $("#db-status").textContent = parts.join(" · ");
 }
 
+// Before every request: after an error, no previous result may pass for this one's.
+function clearResult() {
+  $("#db-result thead").replaceChildren();
+  $("#db-result tbody").replaceChildren();
+  $("#db-status").textContent = "";
+  dbPrev.hidden = dbNext.hidden = true;
+}
+
 async function loadTables() {
   const { rows } = await api("sql", { sql: LIST_TABLES });
   $("#db-tables").replaceChildren(
@@ -44,6 +52,7 @@ async function browse(table, offset) {
   const sql = `SELECT * FROM ${quoteName(table)} LIMIT ${DB_PAGE + 1} OFFSET ${offset}`;
   dbForm.elements.sql.value = sql;
   dbForm.querySelector(".error").textContent = "";
+  clearResult();
   try {
     const data = await api("sql", { sql });
     dbPage = { table, offset };
@@ -55,12 +64,19 @@ async function browse(table, offset) {
   }
 }
 
+const runButton = dbForm.querySelector("button");
 onSubmit(dbForm, async ({ sql }) => {
-  dbPage = null;
-  dbPrev.hidden = dbNext.hidden = true;
-  $("#db-status").textContent = "";
-  renderResult(await api("sql", { sql }));
-  await loadTables(); // a CREATE or DROP shows at once
+  // A double click or Ctrl+Enter would run an INSERT twice. requestSubmit() ignores a disabled button: check it here.
+  if (runButton.disabled) return;
+  runButton.disabled = true;
+  try {
+    dbPage = null;
+    clearResult();
+    renderResult(await api("sql", { sql }));
+    await loadTables(); // a CREATE or DROP shows at once
+  } finally {
+    runButton.disabled = false;
+  }
 });
 dbForm.elements.sql.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) dbForm.requestSubmit();

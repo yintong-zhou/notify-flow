@@ -55,6 +55,12 @@ describe("POST /admin/api/sql", () => {
     expect((await ok("INSERT INTO scratch (id, name) VALUES (1, 'a'); SELECT name FROM scratch")).rows).toEqual([{ name: "a" }]);
   });
 
+  it("rolls back every statement of a string when a later one fails", async () => {
+    // A runtime failure (duplicate key), not a syntax error that would stop the string before anything runs.
+    expect((await run("INSERT INTO scratch (id, name) VALUES (1, 'a'); INSERT INTO scratch (id, name) VALUES (1, 'b')")).status).toBe(400);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM scratch").first("n")).toBe(0);
+  });
+
   it("collapses duplicate column names into the last one", async () => {
     expect(await ok("SELECT 1 AS id, 2 AS id")).toMatchObject({ columns: ["id"], rows: [{ id: 2 }] });
   });

@@ -50,7 +50,7 @@ The **Database** section browses and changes the D1 database directly. Click a t
 
 - **Writes are immediate and unrestricted.** `UPDATE`, `DELETE`, `DROP` run as typed, with no confirmation and no undo; the admin session is the only gate. You can also lock yourself out by changing `admin_user` or `admin_sessions`.
 - **At most 1000 rows** come back; D1 still reads the whole result, so add `LIMIT` to large queries.
-- **Several statements** separated by `;` all run, but only the last one's rows are shown.
+- **Several statements** separated by `;` all run, but only the last one's rows are shown. They run as one unit: if one fails, none of them is applied.
 - **Duplicate column names** (`SELECT a.id, b.id …`) collapse into one: alias them (`b.id AS b_id`).
 - The SQL text and D1's error messages are never written to the logs: a failed statement is logged only as `sql_error`.
 

@@ -67,3 +67,33 @@ export async function deliveries(req: Request, env: Env): Promise<Response> {
   const last = page.at(-1);
   return Response.json({ deliveries: page, next: results.length > PAGE && last ? `${last.created_at}:${last.id}` : null });
 }
+
+const LEVELS = ["error", "warn", "info"];
+const LOG_FILTERS = ["level", "code", "client_id", "ip", "message_id"] as const;
+
+export async function logs(req: Request, env: Env): Promise<Response> {
+  const params = new URL(req.url).searchParams;
+  const where: string[] = [];
+  const binds: (string | number)[] = [];
+  for (const field of LOG_FILTERS) {
+    const value = params.get(field);
+    if (!value) continue;
+    if (field === "level" && !LEVELS.includes(value)) invalid("level must be one of error, warn, info");
+    where.push(`l.${field} = ?`); // field comes from LOG_FILTERS, never from the request
+    binds.push(value);
+  }
+  const before = params.get("before");
+  if (before) {
+    if (!/^[1-9]\d{0,15}$/.test(before)) invalid("before must be a cursor returned as next");
+    where.push("l.id < ?");
+    binds.push(Number(before));
+  }
+  const { results } = await env.DB.prepare(
+    `SELECT l.*, c.name AS client_name FROM app_logs l LEFT JOIN clients c ON c.id = l.client_id
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY l.id DESC LIMIT ?`,
+  )
+    .bind(...binds, PAGE + 1)
+    .all<{ id: number }>();
+  const page = results.slice(0, PAGE);
+  return Response.json({ logs: page, next: results.length > PAGE ? page[PAGE - 1].id : null });
+}

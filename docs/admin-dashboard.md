@@ -1,6 +1,6 @@
 # Admin dashboard
 
-The Worker serves a monitoring page at `/admin/`. It shows how many emails were submitted or failed, which errors happen most, a chart over time, and a search for single deliveries. There is one admin account, created on the first visit.
+The Worker serves a monitoring page at `/admin/`. It shows how many emails were submitted or failed, which errors happen most, a chart over time, and a search for single deliveries. It also lists logged errors and rejected requests, and has a SQL console on the D1 database. There is one admin account, created on the first visit.
 
 ## Set up
 
@@ -8,7 +8,7 @@ The Worker serves a monitoring page at `/admin/`. It shows how many emails were 
    ```bash
    npx wrangler secret put ADMIN_SETUP_TOKEN
    ```
-   For `npm run dev`, put `ADMIN_SETUP_TOKEN=…` in `.dev.vars` instead.
+   For `npm run dev`, put `ADMIN_SETUP_TOKEN=…` in `.dev.vars` instead, and open `http://localhost:8787/admin/`: over plain HTTP, browsers keep the `Secure` session cookie for `localhost` but may drop it for `127.0.0.1`, and the login does not stick.
 2. Apply the migrations and deploy: `npm run db:migrate:remote`, then `npm run deploy`.
 3. Open `https://<worker>.<subdomain>.workers.dev/admin/`. Enter the setup token, your email and a password of at least 12 characters.
 

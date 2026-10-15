@@ -89,8 +89,8 @@ async function changePassword(req: Request, env: Env): Promise<Response> {
   const current = await requireSession(req, env.DB);
   const body = await readJson(req);
   const next = parseNewPassword(body.new, "new");
-  const admin = (await adminRow(env.DB))!; // a session exists only after setup
-  if (typeof body.current !== "string" || body.current.length > 256 || !(await verifyPassword(body.current, admin.password_hash))) {
+  const admin = await adminRow(env.DB); // null only if the row was deleted by hand while sessions remained
+  if (!admin || typeof body.current !== "string" || body.current.length > 256 || !(await verifyPassword(body.current, admin.password_hash))) {
     throw invalidCredentials();
   }
   await env.DB.batch([
@@ -119,5 +119,8 @@ export async function handleAdmin(req: Request, env: Env, route: string): Promis
   if (!Object.hasOwn(methods, req.method)) {
     throw new HttpError(405, "method_not_allowed", `Allowed methods: ${Object.keys(methods).join(", ")}`);
   }
-  return methods[req.method](req, env);
+  const res = await methods[req.method](req, env);
+  // Responses carry recipients and account data: never keep them in a browser or proxy cache.
+  res.headers.set("Cache-Control", "no-store");
+  return res;
 }

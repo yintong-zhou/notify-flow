@@ -9,7 +9,8 @@ let cursor = null;
 async function api(path, body) {
   const init = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
   const res = await fetch(`/admin/api/${path}`, init);
-  const data = res.status === 204 ? null : await res.json();
+  // A Cloudflare error page is HTML: fall back to the HTTP status instead of a JSON parse error.
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (res.ok) return data;
   // Only a missing or expired session goes back to login: a wrong current password is invalid_credentials.
   if (data?.error?.code === "unauthorized") show("login");
@@ -159,7 +160,12 @@ onSubmit($("#password-form"), async (values) => {
 });
 $("#window").addEventListener("change", refresh);
 $("#refresh").addEventListener("click", refresh);
-$("#more").addEventListener("click", () => loadDeliveries(false).catch(showError));
+$("#more").addEventListener("click", async (event) => {
+  // Disabled while loading: a double click would fetch the same cursor twice and duplicate rows.
+  event.target.disabled = true;
+  await loadDeliveries(false).catch(showError);
+  event.target.disabled = false;
+});
 $("#logout").addEventListener("click", () => api("logout", {}).then(() => show("login"), showError));
 
 api("me")

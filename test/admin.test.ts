@@ -126,6 +126,12 @@ describe("password change", () => {
     expect(await code(await adminCall("password", { body: { current: PASSWORD, new: NEW_PASSWORD } }))).toBe("unauthorized");
   });
 
+  it("answers 401, not 500, when the admin row was deleted but a session was kept", async () => {
+    const cookie = sessionCookie(await setup());
+    await env.DB.prepare("DELETE FROM admin_user").run();
+    expect(await code(await adminCall("password", { body: { current: PASSWORD, new: NEW_PASSWORD }, cookie }))).toBe("invalid_credentials");
+  });
+
   it("checks the current password and logs out every other session", async () => {
     const mine = sessionCookie(await setup());
     const other = sessionCookie(await login());

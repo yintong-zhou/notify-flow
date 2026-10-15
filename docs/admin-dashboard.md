@@ -38,3 +38,4 @@ Everything comes from the delivery log (`email_deliveries`), which keeps 30 days
 - **Separate from API keys:** client API keys do not open `/admin`, and the session does not work on `/v1`.
 - **Login rate limit:** setup, login and password change allow 10 attempts per minute per IP.
 - **Password change:** changing the password logs out every other session.
+- **Headers:** the pages are served with a Content Security Policy that blocks other origins and framing (`public/_headers`), and API responses are never cached.

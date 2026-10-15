@@ -72,7 +72,7 @@ describe("GET /admin/api/stats", () => {
     ]);
   });
 
-  it("buckets the series by hour for 24h and by UTC day for 7d", async () => {
+  it("buckets the series by hour for 24h and by UTC day for 7d and 30d", async () => {
     const id = await insert({ status: "submitted", age: 3 * HOUR });
     const created = (await env.DB.prepare("SELECT created_at FROM email_deliveries WHERE id = ?").bind(id).first<number>("created_at"))!;
     const hourly = (await get("stats")).series;
@@ -81,6 +81,12 @@ describe("GET /admin/api/stats", () => {
     const daily = (await get("stats?window=7d")).series;
     expect(daily).toContainEqual({ bucket: created - (created % DAY), status: "submitted", count: 1 });
     expect(daily.every((p: any) => p.bucket % DAY === 0)).toBe(true);
+    expect((await get("stats?window=30d")).series).toEqual(daily);
+  });
+
+  it("marks admin API responses as not cacheable", async () => {
+    const res = await adminCall("deliveries", { cookie });
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("rejects an unknown window", async () => {

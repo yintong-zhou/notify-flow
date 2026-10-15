@@ -38,7 +38,7 @@ Async (`Prefer: respond-async`): the route enqueues to `EMAIL_QUEUE` and answers
 
 Events (`POST /v1/notifications`): `routes/notifications.ts` resolves the event to a template name (the client's `event_routes` row, then `BUILTIN_EVENTS` in `templates/events.ts`) and calls the same `dispatch` as `/v1/email/send`; `/v1/events` manages the mappings.
 
-Admin (`/admin/`): static pages in `public/admin/` (Workers static assets) call `/admin/api/*` (`src/admin/`), authenticated by a D1 session cookie, never by API key. One admin, created once with the `ADMIN_SETUP_TOKEN` secret. Stats and search only read `email_deliveries`; see `docs/admin-dashboard.md`.
+Admin (`/admin/`): static pages in `public/admin/` (Workers static assets) call `/admin/api/*` (`src/admin/`), authenticated by a D1 session cookie, never by API key. One admin, created once with the `ADMIN_SETUP_TOKEN` secret. Stats and search only read `email_deliveries`; the Database section (`POST /admin/api/sql`) runs any SQL on D1. See `docs/admin-dashboard.md`.
 
 Logging: `services/logger.ts` — `log()` writes `app_logs` and never throws; `index.ts` `errorResponse` logs every error response (warn/info capped per IP by `LOG_RATE_LIMITER`); send retries log `smtp_attempt_failed`.
 

@@ -24,7 +24,7 @@ npx wrangler d1 execute notify-flow --remote --command "DELETE FROM admin_sessio
 
 ## What it shows
 
-Everything comes from the delivery log (`email_deliveries`), which keeps 30 days. The log never stores email content or variables, so the dashboard shows **whether** an email went out, never **what** it said.
+The cards, chart, errors and deliveries come from the delivery log (`email_deliveries`), which keeps 30 days. The log never stores email content or variables, so the dashboard shows **whether** an email went out, never **what** it said.
 
 - **Cards:** deliveries per status in the chosen window (24 hours, 7 days or 30 days). Statuses are described in [Delivery statuses](api-reference.md#delivery-statuses). `submitted` means the SMTP server accepted the email, not that it reached the inbox.
 - **`stalled`:** deliveries in `processing` for more than 5 minutes. The send died midway, so the email may or may not have gone out. They are also counted in `processing`. They turn `failed` with `error_code: "abandoned"` when read through `GET /v1/email/:id`.
@@ -43,6 +43,16 @@ The **Logs** section lists what went wrong, newest first, filtered by level, cod
 Each row holds the time, level, code, HTTP status, method and path (never the query string), client, message id, the caller's full IP and a short detail. Variables, email content, tokens, credentials and SMTP reply text are never stored. At most about 30 warn/info rows per minute are kept per IP (per /64 for IPv6, so rotating addresses does not help), so a scanner cannot flood the table; errors and SMTP attempts are always kept. Rows, IPs included, are deleted after 30 days.
 
 Click a message id in Deliveries to see that email's events, or an IP to see everything it triggered.
+
+## Database
+
+The **Database** section browses and changes the D1 database directly. Click a table to see it 50 rows at a time, or type any SQL statement and press **Run** (or Ctrl+Enter).
+
+- **Writes are immediate and unrestricted.** `UPDATE`, `DELETE`, `DROP` run as typed, with no confirmation and no undo; the admin session is the only gate. You can also lock yourself out by changing `admin_user` or `admin_sessions`.
+- **At most 1000 rows** come back; D1 still reads the whole result, so add `LIMIT` to large queries.
+- **Several statements** separated by `;` all run, but only the last one's rows are shown.
+- **Duplicate column names** (`SELECT a.id, b.id …`) collapse into one: alias them (`b.id AS b_id`).
+- The SQL text and D1's error messages are never written to the logs: a failed statement is logged only as `sql_error`.
 
 ## Security
 

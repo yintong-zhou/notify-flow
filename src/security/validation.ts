@@ -72,7 +72,7 @@ export function parseTemplate(body: Record<string, unknown>): Template {
 
 // Printable ASCII without <>()[]\,;:@" and space: no CR/LF, a single recipient, nothing that needs quoting.
 const ATOM = "[\\w.!#$%&'*+/=?^`{|}~-]+";
-const EMAIL_RE = new RegExp(`^${ATOM}@${ATOM}\\.${ATOM}$`);
+export const EMAIL_RE = new RegExp(`^${ATOM}@${ATOM}\\.${ATOM}$`);
 
 export interface SendRequest {
   template: string;

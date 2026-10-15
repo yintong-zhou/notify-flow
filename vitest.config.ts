@@ -14,6 +14,7 @@ export default defineConfig(async () => {
             SMTP_PASSWORD: "secret",
             SMTP_FROM_EMAIL: "noreply@example.com",
             SMTP_FROM_NAME: "Notify Flow",
+            ADMIN_SETUP_TOKEN: "test-setup-token",
           },
         },
       }),

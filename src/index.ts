@@ -1,3 +1,5 @@
+import { purgeSessions } from "./admin/auth";
+import { handleAdmin } from "./admin/routes";
 import { getEmail, sendEmail } from "./routes/email";
 import { deleteEvent, getEvent, listEvents, putEvent } from "./routes/events";
 import { sendNotification } from "./routes/notifications";
@@ -26,6 +28,7 @@ export async function handle(
       allow(req, "GET");
       return health();
     }
+    if (pathname.startsWith("/admin/api/")) return await handleAdmin(req, env, pathname.slice("/admin/api/".length));
     if (!pathname.startsWith("/v1/")) throw new HttpError(404, "not_found", "Route not found");
 
     await checkIpLimit(env, req);
@@ -92,6 +95,6 @@ function errorResponse(e: unknown): Response {
 
 export default {
   fetch: (req, env, ctx) => handle(req, env, sendMail, ctx),
-  scheduled: (_controller, env, ctx) => ctx.waitUntil(purgeDeliveries(env.DB)),
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.all([purgeDeliveries(env.DB), purgeSessions(env.DB)])),
   queue: (batch, env) => handleQueue(batch, env, sendMail),
 } satisfies ExportedHandler<Env, QueuedEmail>;

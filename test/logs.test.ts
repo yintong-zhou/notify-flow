@@ -84,3 +84,17 @@ describe("purgeLogs", () => {
     expect((await rows()).map((r) => r.code)).toEqual(["new"]);
   });
 });
+
+describe("SMTP attempts", () => {
+  it("logs each transient failure before a retry, without the SMTP message", async () => {
+    const { key } = await createClient();
+    const transient = () => new SmtpError("smtp_timeout", true, "no reply from mx for bob@example.com");
+    const { id, status } = await (await sendWith(key, recorder(transient(), transient()).send)).json<any>();
+    expect(status).toBe("submitted");
+    expect((await rows()).map((r) => [r.level, r.code, r.message_id, r.detail])).toEqual([
+      ["warn", "smtp_attempt_failed", id, "smtp_timeout attempt 1/3"],
+      ["warn", "smtp_attempt_failed", id, "smtp_timeout attempt 2/3"],
+    ]);
+    expect(JSON.stringify(await rows())).not.toContain("bob@example.com");
+  });
+});

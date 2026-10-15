@@ -3,6 +3,7 @@ import { resolveSmtpConfig, type SmtpConfig } from "../smtp/provider";
 import { SmtpError, type MailMessage, type SendMailFn } from "../smtp/smtp-client";
 import { checkVariables, render, resolveTemplate, type Rendered } from "../templates/renderer";
 import { HttpError, type DeliveryStatus, type Template } from "../types";
+import { log } from "./logger";
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [500, 1000];
@@ -169,6 +170,7 @@ export async function sendTemplatedEmail(
     } catch (e) {
       const smtp = e instanceof SmtpError ? e : null;
       if (smtp?.transient && attempt < MAX_ATTEMPTS) {
+        await log(env.DB, { level: "warn", code: "smtp_attempt_failed", client_id: clientId, message_id: id, detail: `${smtp.code} attempt ${attempt}/${MAX_ATTEMPTS}` });
         await sleep(BACKOFF_MS[attempt - 1]);
         continue;
       }
@@ -176,7 +178,6 @@ export async function sendTemplatedEmail(
       await env.DB.prepare("UPDATE email_deliveries SET status = 'failed', attempts = ?, error_code = ? WHERE id = ?")
         .bind(attempt, errorCode, id)
         .run();
-      console.error(JSON.stringify({ id, client_id: clientId, error_code: errorCode }));
       if (!smtp) throw e;
       const message =
         smtp.code === "smtp_unconfirmed"
@@ -218,7 +219,6 @@ export async function enqueueTemplatedEmail(env: Env, clientId: string, request:
   } catch {
     // The row stays queued (no second write that could fail too): a retry with the same Idempotency-Key enqueues it
     // again, and the daily cron closes it after 24 hours otherwise.
-    console.error(JSON.stringify({ id, client_id: clientId, error_code: "enqueue_failed" }));
     throw new HttpError(503, "queue_unavailable", "The send queue is unavailable: retry later with the same Idempotency-Key", { id });
   }
   return { id, status: "queued" };

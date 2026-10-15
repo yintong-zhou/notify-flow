@@ -100,6 +100,32 @@ async function changePassword(req: Request, env: Env): Promise<Response> {
   return new Response(null, { status: 204 });
 }
 
+const MAX_SQL_CHARS = 100_000;
+const MAX_SQL_ROWS = 1000;
+
+/** Any statement on D1, reads and writes: the session is the only gate. Neither the SQL nor D1's message is ever logged. */
+async function runSql(req: Request, env: Env): Promise<Response> {
+  requireJson(req);
+  const { sql } = await readJson(req);
+  if (typeof sql !== "string" || !sql.trim() || sql.length > MAX_SQL_CHARS) invalid(`sql must be 1-${MAX_SQL_CHARS} characters`);
+  let result: D1Result<Record<string, unknown>>;
+  try {
+    // With several statements D1 runs them all and returns the last one's rows.
+    result = await env.DB.prepare(sql).all();
+  } catch (e) {
+    // For the admin's eyes: errorResponse logs the code and status, never the message.
+    throw new HttpError(400, "sql_error", e instanceof Error ? e.message : "Query failed");
+  }
+  const { results, meta } = result;
+  const rows = results.slice(0, MAX_SQL_ROWS);
+  return Response.json({
+    columns: rows[0] ? Object.keys(rows[0]) : [],
+    rows,
+    truncated: results.length > MAX_SQL_ROWS,
+    meta: { changes: meta.changes, rows_read: meta.rows_read, rows_written: meta.rows_written, duration: meta.duration },
+  });
+}
+
 const ROUTES: Record<string, Record<string, Handler>> = {
   me: { GET: me },
   setup: { POST: setup },
@@ -109,6 +135,7 @@ const ROUTES: Record<string, Record<string, Handler>> = {
   stats: { GET: withSession(stats) },
   deliveries: { GET: withSession(deliveries) },
   logs: { GET: withSession(logs) },
+  sql: { POST: withSession(runSql) },
 };
 
 /** `/admin/api/<route>`: the dashboard's JSON API. A session cookie authenticates it, never an API key. */

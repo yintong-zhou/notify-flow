@@ -14,4 +14,4 @@ notify-flow runs in your own Cloudflare account: one Worker, one D1 database and
 
 ## Next
 
-Wire your app to it with the [integration guide](web-app-integration.md), or look up an endpoint in the [API Reference](api-reference.md).
+Wire your app to it with the [integration guide](web-app-integration.md), or look up an endpoint in the [API Reference](api-reference.md). To monitor deliveries and errors, set up the [admin dashboard](admin-dashboard.md).

@@ -47,7 +47,7 @@ cp wrangler.jsonc.example wrangler.jsonc # git-ignored: fill in your database_id
 npm run db:migrate:local
 npm run client:create -- my-app          # prints the API key once
 cp .dev.vars.example .dev.vars           # fill in your SMTP credentials
-npm run dev
+npm run dev                              # admin dashboard: http://localhost:8787/admin/ (not 127.0.0.1)
 ```
 
 To deploy:
@@ -82,6 +82,10 @@ A web app sends email in three steps:
 3. **Handle the result.** Retry network errors, `429` and `500` with the same `Idempotency-Key`. Treat `4xx` as integration bugs.
 
 The **[web app integration guide](docs/web-app-integration.md)** covers the details: architecture, Node.js and Python clients, password reset and sign-up flows, custom templates, retry rules, [asynchronous sending](docs/web-app-integration-async.md) and a production checklist.
+
+## Admin dashboard
+
+The Worker also serves a monitoring page at `/admin/`: delivery stats and search, a log of errors and rejected requests, and a SQL console on the D1 database. There is one admin account, registered on the first visit with the `ADMIN_SETUP_TOKEN` secret and kept separate from client API keys. The **[admin dashboard guide](docs/admin-dashboard.md)** covers setup, upgrades of an existing deployment, and what each section shows.
 
 ## API
 
@@ -148,12 +152,14 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 ```text
 src/
 ├── index.ts       # Worker entry point and router
+├── admin/         # dashboard API: setup, login, sessions, stats, logs, SQL
 ├── routes/        # email, notifications, events, templates, health
 ├── security/      # auth, payload validation, rate limiting
-├── services/      # email-service (idempotency, retries, delivery log), queue-consumer (async sends)
+├── services/      # email-service (idempotency, retries, delivery log), queue-consumer (async sends), logger (app_logs)
 ├── templates/     # renderer, built-in defaults, built-in events
 ├── smtp/          # SMTP client + provider presets
 └── types/
+public/admin/      # dashboard pages, served as static assets
 migrations/        # D1 schema
 scripts/           # create-client.mjs
 test/              # vitest, runs inside workerd

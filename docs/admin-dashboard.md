@@ -12,7 +12,9 @@ The Worker serves a monitoring page at `/admin/`. It shows how many emails were 
 2. Apply the migrations and deploy: `npm run db:migrate:remote`, then `npm run deploy`.
 3. Open `https://<worker>.<subdomain>.workers.dev/admin/`. Enter the setup token, your email and a password of at least 12 characters.
 
-Registration then closes: a second setup answers `409 already_registered`. You can delete the token afterwards with `npx wrangler secret delete ADMIN_SETUP_TOKEN`. Without it, setup is always refused.
+Registration then closes: a second setup answers `409 already_registered`, so the token does nothing afterwards. Keep the secret set anyway: `ADMIN_SETUP_TOKEN` is a required secret, and `npm run deploy` fails without it. To retire the value, overwrite it with a new random string.
+
+**Upgrading an existing deployment:** set `ADMIN_SETUP_TOKEN` once before the next `npm run deploy`, as well as running the migrations.
 
 **Lost password:** delete the account, set the token again, and register again:
 

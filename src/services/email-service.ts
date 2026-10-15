@@ -23,7 +23,7 @@ export interface SendOptions {
 }
 
 // Longer than the worst-case send (3 attempts x per-command timeouts + backoff), so only truly abandoned rows match.
-const ABANDONED_AFTER_S = 300;
+export const ABANDONED_AFTER_S = 300;
 
 /**
  * A client's delivery by id or Idempotency-Key. A `processing` row claimed (on the sync path: created) more than

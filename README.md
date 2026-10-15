@@ -57,6 +57,7 @@ npx wrangler d1 create notify-flow       # copy the database_id into wrangler.js
 npm run db:migrate:remote                # on upgrades too: migrate before npm run deploy
 npx wrangler queues create notify-flow-emails  # once: the async send queue
 npx wrangler secret put SMTP_USERNAME    # repeat for SMTP_PASSWORD, SMTP_FROM_EMAIL, SMTP_FROM_NAME
+npx wrangler secret put ADMIN_SETUP_TOKEN  # long random string, used once to register the /admin account
 npm run deploy
 npm run client:create -- my-app --remote
 ```

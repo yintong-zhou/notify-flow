@@ -8,6 +8,7 @@ import { deleteTemplate, getTemplate, listTemplates, putTemplate } from "./route
 import { authenticate } from "./security/auth";
 import { checkClientLimit, checkIpLimit } from "./security/rate-limit";
 import { purgeDeliveries, type QueuedEmail } from "./services/email-service";
+import { logRequestError, purgeLogs } from "./services/logger";
 import { handleQueue } from "./services/queue-consumer";
 import { sendMail, type SendMailFn } from "./smtp/smtp-client";
 import { HttpError } from "./types";
@@ -22,6 +23,7 @@ export async function handle(
   send: SendMailFn = sendMail,
   ctx?: ExecutionContext,
 ): Promise<Response> {
+  let clientId: string | undefined;
   try {
     const { pathname } = new URL(req.url);
     if (pathname === "/health") {
@@ -32,7 +34,7 @@ export async function handle(
     if (!pathname.startsWith("/v1/")) throw new HttpError(404, "not_found", "Route not found");
 
     await checkIpLimit(env, req);
-    const clientId = await authenticate(req, env);
+    clientId = await authenticate(req, env);
     await checkClientLimit(env, clientId);
 
     if (pathname === "/v1/email/send") {
@@ -74,7 +76,7 @@ export async function handle(
     }
     throw new HttpError(404, "not_found", "Route not found");
   } catch (e) {
-    return errorResponse(e);
+    return await errorResponse(req, env, e, clientId, ctx);
   }
 }
 
@@ -84,17 +86,17 @@ function allow(req: Request, ...methods: string[]): void {
   }
 }
 
-function errorResponse(e: unknown): Response {
-  if (e instanceof HttpError) {
-    return Response.json({ error: { code: e.code, message: e.message }, ...e.extra }, { status: e.status });
-  }
-  // No e.message: an unexpected error could carry request data, and logs must never hold it.
-  console.error(JSON.stringify({ error_code: "internal_error" }));
-  return Response.json({ error: { code: "internal_error", message: "Internal error" } }, { status: 500 });
+async function errorResponse(req: Request, env: Env, e: unknown, clientId?: string, ctx?: ExecutionContext): Promise<Response> {
+  // No e.message for unexpected errors: it could carry request data, and logs must never hold it.
+  const error = e instanceof HttpError ? e : new HttpError(500, "internal_error", "Internal error");
+  const logged = logRequestError(env, req, error, clientId);
+  if (ctx) ctx.waitUntil(logged);
+  else await logged;
+  return Response.json({ error: { code: error.code, message: error.message }, ...error.extra }, { status: error.status });
 }
 
 export default {
   fetch: (req, env, ctx) => handle(req, env, sendMail, ctx),
-  scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.all([purgeDeliveries(env.DB), purgeSessions(env.DB)])),
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.all([purgeDeliveries(env.DB), purgeSessions(env.DB), purgeLogs(env.DB)])),
   queue: (batch, env) => handleQueue(batch, env, sendMail),
 } satisfies ExportedHandler<Env, QueuedEmail>;

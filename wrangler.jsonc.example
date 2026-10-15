@@ -48,6 +48,12 @@
       "name": "ADMIN_RATE_LIMITER",          // name used in code — do not change
       "namespace_id": "1003",
       "simple": { "limit": 10, "period": 60 }
+    },
+    // Per-IP cap on request warn/info log rows: anonymous traffic cannot flood app_logs.
+    {
+      "name": "LOG_RATE_LIMITER",            // name used in code — do not change
+      "namespace_id": "1004",
+      "simple": { "limit": 30, "period": 60 }
     }
   ],
 

@@ -13,9 +13,7 @@ let cookie: string;
 let clientId: string;
 
 async function insert(level: string, code: string, extra: { client_id?: string; message_id?: string; ip?: string } = {}): Promise<number> {
-  return (await env.DB.prepare(
-    "INSERT INTO app_logs (created_at, level, code, client_id, message_id, ip) VALUES (unixepoch(), ?, ?, ?, ?, ?) RETURNING id",
-  )
+  return (await env.DB.prepare("INSERT INTO app_logs (created_at, level, code, client_id, message_id, ip) VALUES (unixepoch(), ?, ?, ?, ?, ?) RETURNING id")
     .bind(level, code, extra.client_id ?? null, extra.message_id ?? null, extra.ip ?? null)
     .first<number>("id"))!;
 }

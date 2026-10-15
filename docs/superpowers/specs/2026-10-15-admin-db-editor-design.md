@@ -43,23 +43,24 @@ The handler runs `env.DB.prepare(sql).all()` and answers `200`:
 - `rows`: at most 1000; `truncated: true` when D1 returned more. D1 still reads them all, so the docs tell the admin to add `LIMIT`.
 - `columns`: the keys of the first row; `[]` when there are no rows. Two result columns with the same name (a JOIN on `id`) collapse into one: the docs say to alias them.
 - `meta`: copied from D1's result `meta`, only these four fields.
-- Multiple statements in one string: whatever D1's `prepare().all()` does, pinned by a test in the plan. Supporting them is out of scope.
+- Multiple statements in one string: D1 runs them all and returns only the last one's rows (checked in miniflare); a test pins it and the docs say so.
+- Whitespace-only `sql` counts as empty (D1 would answer "No SQL statements detected").
 
 Errors:
 - D1 throws → `400 sql_error` whose `message` is D1's error message (the admin needs it to fix the query).
 - `errorResponse` logs it like any error response (`logRequestError`): `code`, `status`, `method`, `path`, `ip` only. The SQL text and D1's message never reach `app_logs` or `console.log` (constraint in `CLAUDE.md`: a statement can carry recipients or other data).
 
-Code: `src/admin/sql.ts` (the handler), added to `ROUTES` in `src/admin/routes.ts` as `sql: { POST: withSession(sql) }`.
+Code: a `runSql` handler in `src/admin/routes.ts`, next to `requireJson` (not exported, so no new file), registered as `sql: { POST: withSession(runSql) }`.
 
 ## UI: Database section
 
 In `public/admin/index.html`, after Logs and before Account. Logic in a new `public/admin/db.js`, loaded with `<script src="db.js" defer>` after `app.js` (which is already 204 lines). Both are classic scripts, so `db.js` calls `app.js`'s global `api(path, body)` helper.
 
-- **Tables:** on dashboard load, `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name`, one button per table.
+- **Tables:** on dashboard load, `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\_%' ESCAPE '\' AND name NOT LIKE '\_cf\_%' ESCAPE '\' ORDER BY name` (`_` escaped: in `LIKE` it is a wildcard), one button per table.
 - **Table view:** a click runs `SELECT * FROM "<name>" LIMIT 51 OFFSET <n>` (the name quoted, `"` doubled). 50 rows shown; the 51st only enables **Next**. **Prev** goes back 50. The SQL box is filled with the statement, so the admin can edit it.
-- **SQL box:** a `<textarea>` and a **Run** button; Ctrl+Enter runs too.
+- **SQL box:** a `<textarea>` and a **Run** button; Ctrl+Enter runs too. After every Run the table list reloads, so a `CREATE` or `DROP` shows at once.
 - **Result:** a table with `columns` as headers; a status line `N rows · M changes · D ms`, plus "showing the first 1000" when `truncated`. Errors in the section's `role="alert"` paragraph.
-- Every cell goes through `textContent`; `null` shows as `NULL`, objects as JSON.
+- Every cell goes through `textContent`; `null` shows as `NULL`, objects as JSON. Cells are cut to 40 characters on screen, with the full value in `title`.
 
 The CSP in `public/_headers` already allows `script-src 'self'`.
 
@@ -83,4 +84,4 @@ The CSP in `public/_headers` already allows `script-src 'self'`.
 
 ## Out of scope
 
-Inline cell editing, CSV export, query history, multiple statements per run, BLOB display (no table has a BLOB column).
+Inline cell editing, CSV export, query history, results of every statement in a multi-statement run, BLOB display (no table has a BLOB column).

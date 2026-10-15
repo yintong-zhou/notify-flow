@@ -62,7 +62,7 @@ Every route lives under `/admin/api/`. Routes that change state accept only `Con
 
 - **Password:** PBKDF2-SHA256 via WebCrypto, a 16-byte random salt and 100 000 iterations (the Workers maximum), with a minimum length of 12. Verification uses a constant-time comparison. The `iterations` field is stored, so it can be raised later without a migration.
 - **Setup token:** compared in constant time. A missing `ADMIN_SETUP_TOKEN` disables setup (`403`).
-- **Session:** 32 random bytes in base64url, and the row stores its SHA-256. The cookie is `nf_admin=<token>; HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=604800`. It lasts a fixed 7 days, with no sliding renewal.
+- **Session:** 32 random bytes as hex, and the row stores its SHA-256. The cookie is `nf_admin=<token>; HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=604800`. It lasts a fixed 7 days, with no sliding renewal.
 - **Credentials:** a wrong email and a wrong password get the same `401 invalid_credentials`.
 - **Rate limit:** `ADMIN_RATE_LIMITER` (per IP, 10 requests per 60 s) on `setup`, `login` and `password` answers `429 rate_limited`.
 - **CSRF:** `SameSite=Strict` plus the JSON-only content type. A cross-site form cannot send `application/json` without a CORS preflight, which the Worker never approves.
@@ -94,14 +94,14 @@ Every route lives under `/admin/api/`. Routes that change state accept only `Con
 `GET /admin/api/deliveries?id=&recipient=&client_id=&template=&status=&error_code=&before=`
 
 - Every filter is optional and uses an exact match. `recipient` is lowercased first, as stored.
-- The order is `created_at DESC, id DESC`, 50 rows per page. `before=<created_at>:<id>` is the cursor; the response carries `next` (the cursor of the last row) or `null`.
+- The order is `created_at DESC, id DESC`, 50 rows per page. `before=<created_at>:<id>` is the cursor; the response is `{deliveries, next}`, where `next` is the cursor of the last row or `null`.
 - Each row returns every `email_deliveries` column plus `client_name`. No column holds content, variables or tokens, by the existing logging constraint.
 - A malformed `before` or `status` answers `400 validation_error`.
 
 ## UI (`public/admin/`)
 
-- `setup.html`, `login.html`, `index.html`, `app.js` and `style.css`. Pages carry no data, so serving them without auth is fine.
-- `app.js` calls `GET me` first and routes to setup, login or the dashboard. Any `401` sends the user to the login page.
+- `index.html` (setup, login and dashboard as sections toggled by `hidden`), `app.js` and `style.css`. The page carries no data, so serving it without auth is fine. UI text is in English, like the rest of the repo.
+- `app.js` calls `GET me` first and routes to setup, login or the dashboard. A `401 unauthorized` (not `invalid_credentials`, which a wrong current password also returns) sends the user to the login page.
 - The dashboard has:
   - a window selector and a refresh button (no auto-refresh);
   - status cards, with `failed` and `stalled` highlighted;

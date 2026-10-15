@@ -67,6 +67,16 @@ describe("request errors", () => {
     expect((await rows()).at(-1)).toMatchObject({ level: "error", code: "smtp_failed", ip });
   });
 
+  it("caps IPv6 callers per /64, so rotating addresses inside one prefix does not help", async () => {
+    for (let i = 0; i < 31; i++) {
+      // The first one is written out in full: the same /64 in a different spelling still shares the cap.
+      const ip = i === 0 ? "2001:0DB8:0001:0002:0000:0000:0000:0000" : `2001:db8:1:2::${i.toString(16)}`;
+      await get("/v1/templates", { "X-API-Key": "nf_wrong", "CF-Connecting-IP": ip });
+    }
+    expect(await rows()).toHaveLength(30);
+    expect((await rows())[0].ip).toBe("2001:0DB8:0001:0002:0000:0000:0000:0000");
+  });
+
   it("answers normally when the log limiter fails", async () => {
     const broken = { ...env, LOG_RATE_LIMITER: { limit: async () => { throw new Error("down"); } } } as Env;
     const res = await get("/v1/templates", { "X-API-Key": "nf_wrong", "CF-Connecting-IP": "203.0.113.60" }, broken);

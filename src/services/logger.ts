@@ -32,6 +32,16 @@ export async function log(db: D1Database, event: LogEvent): Promise<void> {
   }
 }
 
+/** The limiter key: the IPv4 address, or the /64 of an IPv6 one (one host usually owns a whole /64). */
+function limitKey(ip: string): string {
+  if (!ip.includes(":")) return ip;
+  const [head, tail] = ip.toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = tail === undefined ? left : [...left, ...Array(8 - left.length - right.length).fill("0"), ...right];
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
+
 /** Logs an error response: 5xx error, 401/403/429 warn, other 4xx info. Warn and info are capped per IP. */
 export async function logRequestError(env: Env, req: Request, error: HttpError, clientId?: string): Promise<void> {
   try {
@@ -40,7 +50,7 @@ export async function logRequestError(env: Env, req: Request, error: HttpError, 
     if (error.status === 404 && !path.startsWith("/v1/") && !path.startsWith("/admin/api/")) return;
     const level = error.status >= 500 ? "error" : [401, 403, 429].includes(error.status) ? "warn" : "info";
     const ip = req.headers.get("CF-Connecting-IP") ?? undefined;
-    if (level !== "error" && ip && !(await env.LOG_RATE_LIMITER.limit({ key: ip })).success) return;
+    if (level !== "error" && ip && !(await env.LOG_RATE_LIMITER.limit({ key: limitKey(ip) })).success) return;
     const messageId = typeof error.extra.id === "string" ? error.extra.id : undefined;
     await log(env.DB, { level, code: error.code, status: error.status, method: req.method, path, client_id: clientId, message_id: messageId, ip });
   } catch {

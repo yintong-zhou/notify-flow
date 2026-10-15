@@ -40,7 +40,7 @@ The **Logs** section lists what went wrong, newest first, filtered by level, cod
 - **warn:** failed SMTP attempts before a retry (`smtp_attempt_failed`, e.g. `smtp_timeout attempt 2/3`), and 401, 403 and 429 responses.
 - **info:** other 4xx responses under `/v1` and `/admin/api` (`validation_error`, `template_not_found`, …). 404s on other paths are not logged.
 
-Each row holds the time, level, code, HTTP status, method and path (never the query string), client, message id, the caller's full IP and a short detail. Variables, email content, tokens, credentials and SMTP reply text are never stored. At most 30 warn/info rows per minute are kept per IP, so a scanner cannot flood the table; errors and SMTP attempts are always kept. Rows, IPs included, are deleted after 30 days.
+Each row holds the time, level, code, HTTP status, method and path (never the query string), client, message id, the caller's full IP and a short detail. Variables, email content, tokens, credentials and SMTP reply text are never stored. At most about 30 warn/info rows per minute are kept per IP (per /64 for IPv6, so rotating addresses does not help), so a scanner cannot flood the table; errors and SMTP attempts are always kept. Rows, IPs included, are deleted after 30 days.
 
 Click a message id in Deliveries to see that email's events, or an IP to see everything it triggered.
 

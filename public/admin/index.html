@@ -6,6 +6,7 @@
   <title>notify-flow admin</title>
   <link rel="stylesheet" href="style.css">
   <script src="app.js" defer></script>
+  <script src="db.js" defer></script>
 </head>
 <body>
 <main>
@@ -88,6 +89,22 @@
         <th>Message</th><th>IP</th><th>Detail</th></tr></thead><tbody></tbody></table>
     </div>
     <button id="more-logs" type="button" hidden>Load more</button>
+
+    <h2>Database</h2>
+    <div id="db-tables" class="search"></div>
+    <form id="db-form" class="search">
+      <textarea name="sql" rows="4" spellcheck="false" aria-label="SQL" placeholder="SELECT … (Ctrl+Enter to run)"></textarea>
+      <button>Run</button>
+      <p class="error" role="alert"></p>
+    </form>
+    <p id="db-status" role="status"></p>
+    <div class="scroll">
+      <table id="db-result"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="search">
+      <button id="db-prev" type="button" hidden>Prev</button>
+      <button id="db-next" type="button" hidden>Next</button>
+    </div>
 
     <h2>Account</h2>
     <form id="password-form" class="box">

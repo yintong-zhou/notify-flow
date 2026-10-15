@@ -58,6 +58,7 @@ async function refresh() {
     renderErrors(stats.errors);
     await loadDeliveries(true);
     await loadLogs(true);
+    await loadTables();
   } catch (e) {
     showError(e);
   }

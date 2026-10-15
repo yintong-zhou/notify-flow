@@ -29,3 +29,6 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line
 .link { cursor: pointer; text-decoration: underline dotted; }
 .level-error { color: var(--bad); font-weight: 600; }
 .level-warn { color: var(--warn); font-weight: 600; }
+#db-form textarea { flex: 1 1 100%; font: 13px/1.4 ui-monospace, monospace; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+#db-status { color: var(--muted); margin: 8px 0 0; }
+#db-result td { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }

@@ -4,7 +4,6 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const CARDS = ["submitted", "failed", "stalled", "processing", "queued", "retrying", "accepted"];
 const COLORS = { submitted: "#2e9e5b", failed: "#d64545", processing: "#3b82f6", retrying: "#e0a020", queued: "#8a8f98", accepted: "#7c5cd6" };
 const SPANS = { "24h": [86400, 3600], "7d": [604800, 86400], "30d": [2592000, 86400] }; // [span, bucket], as on the server
-let cursor = null;
 
 async function api(path, body) {
   const init = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
@@ -58,6 +57,7 @@ async function refresh() {
     renderChart(stats);
     renderErrors(stats.errors);
     await loadDeliveries(true);
+    await loadLogs(true);
   } catch (e) {
     showError(e);
   }
@@ -125,22 +125,60 @@ function renderChart({ window, series }) {
   );
 }
 
-async function loadDeliveries(reset) {
-  if (reset) {
-    cursor = null;
-    $("#deliveries tbody").replaceChildren();
+/** A filter form, a table and a "Load more" button over a cursor-paged API list. Returns load(reset). */
+function pager(path, formSelector, tableSelector, moreSelector, listKey, toRow) {
+  const form = $(formSelector);
+  const body = $(`${tableSelector} tbody`);
+  const more = $(moreSelector);
+  let cursor = null;
+  async function load(reset) {
+    if (reset) {
+      cursor = null;
+      body.replaceChildren();
+    }
+    const params = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
+    if (cursor !== null) params.set("before", cursor);
+    const data = await api(`${path}?${params}`);
+    body.append(...data[listKey].map(toRow));
+    cursor = data.next;
+    more.hidden = cursor === null;
   }
-  const params = new URLSearchParams([...new FormData($("#search"))].filter(([, v]) => v));
-  if (cursor) params.set("before", cursor);
-  const { deliveries, next } = await api(`deliveries?${params}`);
-  $("#deliveries tbody").append(
-    ...deliveries.map((d) =>
-      row([time(d.created_at), d.id, d.client_name, d.template, d.recipient, d.status, d.attempts, d.error_code, time(d.sent_at)]),
-    ),
-  );
-  cursor = next;
-  $("#more").hidden = !next;
+  onSubmit(form, () => load(true));
+  more.addEventListener("click", async () => {
+    // Disabled while loading: a double click would fetch the same cursor twice and duplicate rows.
+    more.disabled = true;
+    await load(false).catch(showError);
+    more.disabled = false;
+  });
+  return load;
 }
+
+function link(cell, onClick) {
+  cell.classList.add("link");
+  cell.addEventListener("click", onClick);
+}
+
+function showLogs(field, value) {
+  const form = $("#log-search");
+  form.reset();
+  form.elements[field].value = value;
+  loadLogs(true).catch(showError);
+  $("#logs-title").scrollIntoView();
+}
+
+const loadDeliveries = pager("deliveries", "#search", "#deliveries", "#more", "deliveries", (d) => {
+  const tr = row([time(d.created_at), d.id, d.client_name, d.template, d.recipient, d.status, d.attempts, d.error_code, time(d.sent_at)]);
+  link(tr.children[1], () => showLogs("message_id", d.id));
+  return tr;
+});
+
+const loadLogs = pager("logs", "#log-search", "#logs", "#more-logs", "logs", (l) => {
+  const request = [l.method, l.path].filter(Boolean).join(" ");
+  const tr = row([time(l.created_at), l.level, l.code, l.status, request, l.client_name ?? l.client_id, l.message_id, l.ip, l.detail]);
+  tr.children[1].className = `level-${l.level}`;
+  if (l.ip) link(tr.children[7], () => showLogs("ip", l.ip));
+  return tr;
+});
 
 onSubmit($("#setup-form"), async (values) => {
   await api("setup", values);
@@ -152,7 +190,6 @@ onSubmit($("#login-form"), async (values) => {
   $("#login-form").reset();
   show("dashboard");
 });
-onSubmit($("#search"), () => loadDeliveries(true));
 onSubmit($("#password-form"), async (values) => {
   await api("password", values);
   $("#password-form").reset();
@@ -160,12 +197,6 @@ onSubmit($("#password-form"), async (values) => {
 });
 $("#window").addEventListener("change", refresh);
 $("#refresh").addEventListener("click", refresh);
-$("#more").addEventListener("click", async (event) => {
-  // Disabled while loading: a double click would fetch the same cursor twice and duplicate rows.
-  event.target.disabled = true;
-  await loadDeliveries(false).catch(showError);
-  event.target.disabled = false;
-});
 $("#logout").addEventListener("click", () => api("logout", {}).then(() => show("login"), showError));
 
 api("me")

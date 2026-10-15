@@ -2,7 +2,7 @@ import { checkAdminLimit, checkIpLimit } from "../security/rate-limit";
 import { EMAIL_RE, invalid, readJson } from "../security/validation";
 import { HttpError } from "../types";
 import { CLEARED_COOKIE, createSession, hashPassword, requireSession, sameSecret, sessionHash, verifyPassword } from "./auth";
-import { deliveries, stats } from "./stats";
+import { deliveries, logs, stats } from "./stats";
 
 export type Handler = (req: Request, env: Env) => Promise<Response>;
 
@@ -108,6 +108,7 @@ const ROUTES: Record<string, Record<string, Handler>> = {
   password: { POST: changePassword },
   stats: { GET: withSession(stats) },
   deliveries: { GET: withSession(deliveries) },
+  logs: { GET: withSession(logs) },
 };
 
 /** `/admin/api/<route>`: the dashboard's JSON API. A session cookie authenticates it, never an API key. */

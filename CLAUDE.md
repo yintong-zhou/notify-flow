@@ -38,6 +38,10 @@ Async (`Prefer: respond-async`): the route enqueues to `EMAIL_QUEUE` and answers
 
 Events (`POST /v1/notifications`): `routes/notifications.ts` resolves the event to a template name (the client's `event_routes` row, then `BUILTIN_EVENTS` in `templates/events.ts`) and calls the same `dispatch` as `/v1/email/send`; `/v1/events` manages the mappings.
 
+Admin (`/admin/`): static pages in `public/admin/` (Workers static assets) call `/admin/api/*` (`src/admin/`), authenticated by a D1 session cookie, never by API key. One admin, created once with the `ADMIN_SETUP_TOKEN` secret. Stats and search only read `email_deliveries`; the Database section (`POST /admin/api/sql`) runs any SQL on D1. See `docs/admin-dashboard.md`.
+
+Logging: `services/logger.ts` — `log()` writes `app_logs` and never throws; `index.ts` `errorResponse` logs every error response (warn/info capped per IP by `LOG_RATE_LIMITER`); send retries log `smtp_attempt_failed`.
+
 - **Templates only.** Callers choose a template and pass variables. They never send a subject or HTML. Templates come from D1 per client (`templates` table, managed via `/v1/templates`), with fallback to the built-ins in `templates/defaults.ts`, then to `en`. Variables must match the template's declared list exactly. This is a core anti-abuse guarantee, not a convenience.
 - **Generic SMTP client with presets.** `smtp-client.ts` implements EHLO, STARTTLS, AUTH PLAIN/LOGIN, MAIL FROM, RCPT TO, DATA, QUIT and the MIME message. The Gmail, Microsoft and generic presets live in `smtp/provider.ts`. The service layer must not depend on a specific provider.
 - **Raw TCP.** On Workers, use `connect()` from `cloudflare:sockets`. For STARTTLS, use `secureTransport: "starttls"` together with `socket.startTls()`. Outbound port 25 is blocked on Workers.
@@ -46,10 +50,10 @@ Events (`POST /v1/notifications`): `routes/notifications.ts` resolves the event 
 ## Hard constraints from the spec
 
 - **Auth:** each client gets its own API key, sent as `Authorization: Bearer` or `X-API-Key`. Keys are stored only as hex SHA-256 in `clients.key_hash`.
-- **Configuration:** `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` and `SMTP_FROM_NAME` are secrets. `SMTP_PROVIDER`, `SMTP_AUTH_TYPE`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` and `RECIPIENT_LIMIT_PER_HOUR` are `vars` in `wrangler.jsonc`. A Worker can't have a secret and a var with the same name.
+- **Configuration:** `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` and `ADMIN_SETUP_TOKEN` are secrets. `SMTP_PROVIDER`, `SMTP_AUTH_TYPE`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` and `RECIPIENT_LIMIT_PER_HOUR` are `vars` in `wrangler.jsonc`. A Worker can't have a secret and a var with the same name.
 - **Idempotency:** honor the `Idempotency-Key` header, and never send the same message twice. A replay is answered before the recipient limit.
 - **Rate limiting:** 300 requests per 60 s per IP before auth, 60 per 60 s per client (Rate Limiting bindings, every `/v1/*` route), and `RECIPIENT_LIMIT_PER_HOUR` per client, recipient and template (counted inside the delivery `INSERT`, so it is atomic; failed sends excluded).
-- **Logs and delivery records** (`email_deliveries`) must never contain variables, rendered content, tokens, reset URLs or credentials. `console.error` logs only `{id, client_id, error_code}`.
+- **Logs and delivery records** (`email_deliveries`) must never contain variables, rendered content, tokens, reset URLs or credentials. Log events go only through `log()` with the `app_logs` fields: never a query string, `SmtpError.message` or an unexpected error's message.
 - **Statuses:** `accepted`, `queued`, `processing`, `submitted`, `failed`, `retrying`. Use `submitted` and never `delivered`, because SMTP acceptance does not prove inbox delivery.
 
 ## Not in the MVP (spec roadmap)

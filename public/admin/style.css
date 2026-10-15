@@ -1,0 +1,34 @@
+:root { color-scheme: light dark; --bg: #fff; --fg: #1d2129; --muted: #6b7280; --line: #e3e5e8; --card: #f6f7f9; --bad: #d64545; --ok: #2e9e5b; --warn: #b7791f; font: 14px/1.4 system-ui, sans-serif; }
+@media (prefers-color-scheme: dark) { :root { --bg: #15171a; --fg: #e6e8eb; --muted: #9aa0a8; --line: #2a2e33; --card: #1e2125; --warn: #e0a020; } }
+body { margin: 0; background: var(--bg); color: var(--fg); }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+header h1 { margin: 0 auto 0 0; }
+h2 { margin-top: 32px; font-size: 1.1rem; }
+.box { display: grid; gap: 12px; max-width: 360px; }
+label { display: grid; gap: 4px; }
+input, select, button { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+button { cursor: pointer; background: var(--card); }
+.error { color: var(--bad); margin: 0; }
+.ok { color: var(--ok); margin: 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 16px; }
+.card { display: grid; background: var(--card); border-radius: 8px; padding: 12px; }
+.card span { color: var(--muted); }
+.card strong { font-size: 1.6rem; }
+.card.failed strong, .card.stalled strong { color: var(--bad); }
+#chart { display: block; width: 100%; height: 160px; background: var(--card); border-radius: 8px; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 2px; background: var(--swatch); }
+.search { display: flex; flex-wrap: wrap; gap: 8px; }
+.search .error { flex-basis: 100%; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#errors tbody tr { cursor: pointer; }
+#errors tbody tr:hover { background: var(--card); }
+.link { cursor: pointer; text-decoration: underline dotted; }
+.level-error { color: var(--bad); font-weight: 600; }
+.level-warn { color: var(--warn); font-weight: 600; }
+#db-form textarea { flex: 1 1 100%; font: 13px/1.4 ui-monospace, monospace; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+#db-status { color: var(--muted); margin: 8px 0 0; }
+#db-result td { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }

@@ -3,6 +3,7 @@ import { SmtpError, type SendMailFn } from "../smtp/smtp-client";
 import { checkVariables, render, resolveTemplate } from "../templates/renderer";
 import { HttpError } from "../types";
 import { mailMessage, type QueuedEmail } from "./email-service";
+import { log } from "./logger";
 
 type Outcome = NonNullable<QueuedEmail["resume"]>["status"];
 
@@ -43,12 +44,13 @@ async function deliver(msg: Message<QueuedEmail>, env: Env, send: SendMailFn): P
   } catch (e) {
     const smtp = e instanceof SmtpError ? e : null;
     if (smtp?.transient && attempts < MAX_ATTEMPTS) {
+      await log(env.DB, { level: "warn", code: "smtp_attempt_failed", client_id: job.clientId, message_id: job.id, detail: `${smtp.code} attempt ${attempts}/${MAX_ATTEMPTS}` });
       if (await record(msg, env, attempts, "retrying", smtp.code)) msg.retry({ delaySeconds: RETRY_DELAYS_S[attempts - 1] });
       return;
     }
     // Permanent, unconfirmed (a retry could send twice), out of attempts, or the template no longer fits.
     const errorCode = smtp?.code ?? (e instanceof HttpError ? e.code : "internal_error");
-    console.error(JSON.stringify({ id: job.id, client_id: job.clientId, error_code: errorCode }));
+    await log(env.DB, { level: "error", code: errorCode, client_id: job.clientId, message_id: job.id, detail: `attempt ${attempts}/${MAX_ATTEMPTS}` });
     if (await record(msg, env, attempts, "failed", errorCode)) msg.ack();
     return;
   }

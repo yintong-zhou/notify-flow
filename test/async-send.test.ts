@@ -135,6 +135,18 @@ async function queued(): Promise<QueuedEmail> {
 const transient = () => new SmtpError("smtp_timeout", true, "SMTP command timed out");
 
 describe("handleQueue", () => {
+  it("logs a transient failure as smtp_attempt_failed and a final one as an error", async () => {
+    const body = await queued();
+    await consume(recorder(transient()).send, [message(body).msg]);
+    await consume(recorder(new SmtpError("smtp_rejected", false, "SMTP 550 for bob@example.com")).send, [message(body).msg]);
+    const logged = (await env.DB.prepare("SELECT level, code, client_id, detail FROM app_logs WHERE message_id = ? ORDER BY id").bind(body.id).all()).results;
+    expect(logged).toEqual([
+      { level: "warn", code: "smtp_attempt_failed", client_id: body.clientId, detail: "smtp_timeout attempt 1/5" },
+      { level: "error", code: "smtp_rejected", client_id: body.clientId, detail: "attempt 2/5" },
+    ]);
+    expect(JSON.stringify(logged)).not.toContain("bob@example.com");
+  });
+
   it("sends a queued email and acks it", async () => {
     const body = await queued();
     const rec = recorder();

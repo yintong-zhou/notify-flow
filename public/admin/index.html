@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>notify-flow admin</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+  <script src="db.js" defer></script>
+</head>
+<body>
+<main>
+  <section id="setup" hidden>
+    <h1>First-time setup</h1>
+    <form id="setup-form" class="box">
+      <label>Setup token <input name="setup_token" type="password" required autocomplete="off"></label>
+      <label>Email <input name="email" type="email" required autocomplete="username"></label>
+      <label>Password (12+ characters) <input name="password" type="password" minlength="12" maxlength="256" required autocomplete="new-password"></label>
+      <button>Create admin</button>
+      <p class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <section id="login" hidden>
+    <h1>notify-flow admin</h1>
+    <form id="login-form" class="box">
+      <label>Email <input name="email" type="email" required autocomplete="username"></label>
+      <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
+      <button>Log in</button>
+      <p class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <section id="dashboard" hidden>
+    <header>
+      <h1>notify-flow</h1>
+      <select id="window" aria-label="Time window">
+        <option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option>
+      </select>
+      <button id="refresh" type="button">Refresh</button>
+      <button id="logout" type="button">Log out</button>
+    </header>
+    <p id="dash-error" class="error" role="alert"></p>
+    <div id="cards" class="cards"></div>
+
+    <h2>Over time</h2>
+    <svg id="chart" role="img" aria-label="Deliveries over time by status"></svg>
+    <div id="legend" class="legend"></div>
+
+    <h2>Errors</h2>
+    <div class="scroll">
+      <table id="errors"><thead><tr><th>Code</th><th>Client</th><th>Template</th><th>Count</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <h2>Deliveries</h2>
+    <form id="search" class="search">
+      <input name="id" placeholder="msg_…" aria-label="Message id">
+      <input name="recipient" placeholder="Recipient" aria-label="Recipient">
+      <input name="client_id" placeholder="Client id" aria-label="Client id">
+      <input name="template" placeholder="Template" aria-label="Template">
+      <select name="status" aria-label="Status">
+        <option value="">Any status</option><option>submitted</option><option>failed</option><option>processing</option>
+        <option>queued</option><option>retrying</option><option>accepted</option>
+      </select>
+      <input name="error_code" placeholder="Error code" aria-label="Error code">
+      <button>Search</button>
+      <p class="error" role="alert"></p>
+    </form>
+    <div class="scroll">
+      <table id="deliveries"><thead><tr><th>Created</th><th>Id</th><th>Client</th><th>Template</th><th>Recipient</th>
+        <th>Status</th><th>Attempts</th><th>Error</th><th>Sent</th></tr></thead><tbody></tbody></table>
+    </div>
+    <button id="more" type="button" hidden>Load more</button>
+
+    <h2 id="logs-title">Logs</h2>
+    <form id="log-search" class="search">
+      <select name="level" aria-label="Level">
+        <option value="">Any level</option><option>error</option><option>warn</option><option>info</option>
+      </select>
+      <input name="code" placeholder="Code" aria-label="Code">
+      <input name="client_id" placeholder="Client id" aria-label="Client id">
+      <input name="ip" placeholder="IP" aria-label="IP">
+      <input name="message_id" placeholder="msg_…" aria-label="Message id">
+      <button>Search</button>
+      <p class="error" role="alert"></p>
+    </form>
+    <div class="scroll">
+      <table id="logs"><thead><tr><th>Time</th><th>Level</th><th>Code</th><th>Status</th><th>Request</th><th>Client</th>
+        <th>Message</th><th>IP</th><th>Detail</th></tr></thead><tbody></tbody></table>
+    </div>
+    <button id="more-logs" type="button" hidden>Load more</button>
+
+    <h2>Database</h2>
+    <div id="db-tables" class="search"></div>
+    <form id="db-form" class="search">
+      <textarea name="sql" rows="4" spellcheck="false" aria-label="SQL" placeholder="SELECT … (Ctrl+Enter to run)"></textarea>
+      <button>Run</button>
+      <p class="error" role="alert"></p>
+    </form>
+    <p id="db-status" role="status"></p>
+    <div class="scroll">
+      <table id="db-result"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="search">
+      <button id="db-prev" type="button" hidden>Prev</button>
+      <button id="db-next" type="button" hidden>Next</button>
+    </div>
+
+    <h2>Account</h2>
+    <form id="password-form" class="box">
+      <label>Current password <input name="current" type="password" required autocomplete="current-password"></label>
+      <label>New password (12+ characters) <input name="new" type="password" minlength="12" maxlength="256" required autocomplete="new-password"></label>
+      <button>Change password</button>
+      <p class="error" role="alert"></p>
+      <p class="ok" role="status"></p>
+    </form>
+  </section>
+</main>
+</body>
+</html>

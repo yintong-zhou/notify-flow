@@ -33,6 +33,7 @@ export default defineConfig({
             ],
           },
           { text: "AI integration prompt", link: "/ai-integration-prompt" },
+          { text: "Admin dashboard", link: "/admin-dashboard" },
         ],
       },
       {

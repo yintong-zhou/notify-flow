@@ -60,3 +60,40 @@ export function fakeQueue(fail = false): { queue: Queue; sent: any[] } {
   };
   return { queue: { send } as unknown as Queue, sent };
 }
+
+export const SETUP_TOKEN = "test-setup-token";
+
+export interface AdminInit {
+  method?: string;
+  body?: unknown;
+  cookie?: string;
+  headers?: Record<string, string>;
+}
+
+/** Calls /admin/api/<path>. A body means POST with Content-Type: application/json. */
+export function adminCall(path: string, init: AdminInit = {}, testEnv: Env = env): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (init.body !== undefined) headers["Content-Type"] = "application/json";
+  if (init.cookie) headers.Cookie = init.cookie;
+  const method = init.method ?? (init.body === undefined ? "GET" : "POST");
+  const body = init.body === undefined ? undefined : JSON.stringify(init.body);
+  return handle(new Request(`https://notify.test/admin/api/${path}`, { method, headers: { ...headers, ...init.headers }, body }), testEnv);
+}
+
+/** "nf_admin=<token>" from a response's Set-Cookie, ready for a Cookie header. */
+export const sessionCookie = (res: Response): string => res.headers.get("Set-Cookie")!.split(";")[0];
+
+/** D1 state is shared by the tests of a file: start every admin test with no account and no session. */
+export async function resetAdmin(): Promise<void> {
+  await env.DB.batch([env.DB.prepare("DELETE FROM admin_sessions"), env.DB.prepare("DELETE FROM admin_user")]);
+}
+
+/** Registers the admin (admin@example.com / "correct horse battery") and returns its session cookie. */
+export async function setupAdmin(): Promise<string> {
+  await resetAdmin();
+  const res = await adminCall("setup", {
+    body: { setup_token: SETUP_TOKEN, email: "admin@example.com", password: "correct horse battery" },
+  });
+  if (res.status !== 201) throw new Error(`setup failed: ${res.status}`);
+  return sessionCookie(res);
+}

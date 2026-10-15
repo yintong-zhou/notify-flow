@@ -10,6 +10,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
 
+  // Admin dashboard pages (public/admin/), served without running the Worker.
+  // /v1/*, /health and /admin/api/* match no file, so they still reach the Worker.
+  "assets": { "directory": "./public" },
+
   // D1 database holding clients, templates and the delivery log.
   "d1_databases": [
     {
@@ -38,6 +42,18 @@
       "name": "IP_RATE_LIMITER",             // name used in code — do not change
       "namespace_id": "1002",
       "simple": { "limit": 300, "period": 60 }
+    },
+    // Per-IP limit on admin setup, login and password change: slows password guessing.
+    {
+      "name": "ADMIN_RATE_LIMITER",          // name used in code — do not change
+      "namespace_id": "1003",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    // Per-IP cap on request warn/info log rows: anonymous traffic cannot flood app_logs.
+    {
+      "name": "LOG_RATE_LIMITER",            // name used in code — do not change
+      "namespace_id": "1004",
+      "simple": { "limit": 30, "period": 60 }
     }
   ],
 
@@ -72,7 +88,8 @@
   //   SMTP_PASSWORD    SMTP password — for Gmail an app password (16 letters, no spaces)
   //   SMTP_FROM_EMAIL  sender address — with Gmail, the same account as SMTP_USERNAME
   //   SMTP_FROM_NAME   sender display name
+  //   ADMIN_SETUP_TOKEN  one-time token for the first /admin registration (any long random string)
   "secrets": {
-    "required": ["SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "SMTP_FROM_NAME"]
+    "required": ["SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "SMTP_FROM_NAME", "ADMIN_SETUP_TOKEN"]
   }
 }

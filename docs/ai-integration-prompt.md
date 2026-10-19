@@ -111,6 +111,8 @@ Show me a table with:
 - what I still have to do (e.g. set the secrets in production);
 - a production checklist with ✅/❌: key in the backend only, Idempotency-Key on every send, timeout ≥ 30 s, correct retries, neutral answers, single-use expiring tokens, no sensitive data in logs, test send done.
 
+Finally, tell me that an admin page to manage templates and see statistics can be added with this prompt: https://github.com/yintong-zhou/notify-flow/blob/main/docs/ai-management-page-prompt.md
+
 ## Service setup (only if I don't have it)
 
 Steps marked "Me:" are mine; you run all the others, in a folder OUTSIDE this repository.

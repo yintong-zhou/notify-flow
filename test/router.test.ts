@@ -23,7 +23,7 @@ it("wrong method returns 405", async () => {
 it("rate limits /v1/* per IP before checking the API key", async () => {
   const req = () =>
     handle(new Request("https://notify.test/v1/templates", { headers: { "CF-Connecting-IP": "203.0.113.7", "X-API-Key": "nf_wrong" } }), env);
-  for (let i = 0; i < 300; i++) expect((await req()).status).toBe(401);
+  for (let i = 0; i < 600; i++) expect((await req()).status).toBe(401);
   const blocked = await req();
   expect(blocked.status).toBe(429);
   expect((await blocked.json<any>()).error.code).toBe("rate_limited");

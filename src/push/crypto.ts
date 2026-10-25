@@ -100,3 +100,13 @@ export async function vapidAuthorization(endpoint: string, keys: VapidKeys, nowM
   const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, text.encode(unsigned));
   return `vapid t=${unsigned}.${b64url.encode(new Uint8Array(signature))}, k=${keys.publicKey}`;
 }
+
+/** The VAPID settings, or null while any of the three is empty (push is off). */
+export function vapidKeys(env: Env): VapidKeys | null {
+  // VAPID_PRIVATE_KEY is an optional secret, so it is not in the generated Env type.
+  const privateKey = (env as unknown as Record<string, string | undefined>).VAPID_PRIVATE_KEY;
+  if (!env.VAPID_PUBLIC_KEY || !privateKey || !env.VAPID_SUBJECT) return null;
+  return { publicKey: env.VAPID_PUBLIC_KEY, privateKey, subject: env.VAPID_SUBJECT };
+}
+
+export const pushConfigured = (env: Env): boolean => vapidKeys(env) !== null;

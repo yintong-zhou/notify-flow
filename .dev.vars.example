@@ -3,3 +3,4 @@ SMTP_PASSWORD=your-app-password
 SMTP_FROM_EMAIL=you@gmail.com
 SMTP_FROM_NAME=Notify Flow
 ADMIN_SETUP_TOKEN=change-me-to-a-long-random-string
+VAPID_PRIVATE_KEY=

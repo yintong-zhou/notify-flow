@@ -20,3 +20,9 @@ export async function checkAdminLimit(env: Env, req: Request): Promise<void> {
   const { success } = await env.ADMIN_RATE_LIMITER.limit({ key: ip });
   if (!success) throw new HttpError(429, "rate_limited", "Too many attempts from this IP");
 }
+
+/** Push has its own budget, so chat traffic can never cause a 429 on email. */
+export async function checkPushLimit(env: Env, clientId: string): Promise<void> {
+  const { success } = await env.PUSH_RATE_LIMITER.limit({ key: clientId });
+  if (!success) throw new HttpError(429, "rate_limited", "Too many push requests for this client");
+}

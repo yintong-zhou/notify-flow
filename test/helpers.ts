@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { handle } from "../src/index";
 import { b64url, deriveKeys } from "../src/push/crypto";
+import type { PushFetch } from "../src/push/routes";
 import type { MailMessage, SendMailFn } from "../src/smtp/smtp-client";
 import type { Locale, Template } from "../src/types";
 
@@ -32,11 +33,41 @@ export interface CallInit {
   headers?: Record<string, string>;
 }
 
-export function call(path: string, init: CallInit = {}, send: SendMailFn = async () => {}, testEnv: Env = env): Promise<Response> {
+function apiRequest(path: string, init: CallInit): Request {
   const headers: Record<string, string> = { ...init.headers };
   if (init.key) headers.Authorization = `Bearer ${init.key}`;
   const body = init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body));
-  return handle(new Request(`https://notify.test${path}`, { method: init.method ?? "GET", headers, body }), testEnv, send);
+  return new Request(`https://notify.test${path}`, { method: init.method ?? "GET", headers, body });
+}
+
+export function call(path: string, init: CallInit = {}, send: SendMailFn = async () => {}, testEnv: Env = env): Promise<Response> {
+  return handle(apiRequest(path, init), testEnv, send);
+}
+
+/** The RFC 8291 sender key pair (the example's application server), as a test VAPID key pair. */
+export const VAPID_TEST = {
+  publicKey: "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8",
+  privateKey: "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw",
+};
+
+/** `env` with Web Push configured. */
+export const pushEnv = {
+  ...env,
+  VAPID_PUBLIC_KEY: VAPID_TEST.publicKey,
+  VAPID_PRIVATE_KEY: VAPID_TEST.privateKey,
+  VAPID_SUBJECT: "mailto:ops@example.com",
+} as Env;
+
+export async function enablePush(clientId: string, on = true): Promise<void> {
+  await env.DB.prepare("UPDATE clients SET push_enabled = ? WHERE id = ?").bind(on ? 1 : 0, clientId).run();
+}
+
+/** A push service that accepts everything. */
+const accept: PushFetch = async () => new Response(null, { status: 201 });
+
+/** Like `call`, with Web Push configured and the push HTTP call injected. */
+export function pushCall(path: string, init: CallInit = {}, fetchPush: PushFetch = accept, testEnv: Env = pushEnv): Promise<Response> {
+  return handle(apiRequest(path, init), testEnv, async () => {}, undefined, fetchPush);
 }
 
 /** A SendMailFn that records every attempt and throws the queued failures in order (falsy = succeed). */

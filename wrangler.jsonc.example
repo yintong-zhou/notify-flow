@@ -36,12 +36,12 @@
       "namespace_id": "1001",                // any integer, unique within your Cloudflare account
       "simple": { "limit": 60, "period": 60 } // requests per period; period must be 10 or 60 seconds
     },
-    // Per-IP limit on every /v1/* route, checked before the API key: caps anonymous traffic hitting D1.
+    // Per-IP limit on every /v1/* route (email and push), checked before the API key: caps anonymous traffic hitting D1.
     // Keep it above 60 x the number of clients that share one egress IP.
     {
       "name": "IP_RATE_LIMITER",             // name used in code — do not change
       "namespace_id": "1002",
-      "simple": { "limit": 300, "period": 60 }
+      "simple": { "limit": 600, "period": 60 }
     },
     // Per-IP limit on admin setup, login and password change: slows password guessing.
     {
@@ -54,6 +54,12 @@
       "name": "LOG_RATE_LIMITER",            // name used in code — do not change
       "namespace_id": "1004",
       "simple": { "limit": 30, "period": 60 }
+    },
+    // Per-client limit on /v1/push/*, separate so chat traffic never blocks email.
+    {
+      "name": "PUSH_RATE_LIMITER",           // name used in code — do not change
+      "namespace_id": "1005",
+      "simple": { "limit": 600, "period": 60 }
     }
   ],
 
@@ -79,7 +85,10 @@
     "SMTP_HOST": "",                         // override the preset host — required for "generic"
     "SMTP_PORT": "",                         // override the preset port (465 TLS, 587 STARTTLS); 25 is blocked on Workers
     "SMTP_SECURITY": "",                     // tls | starttls — override the preset
-    "RECIPIENT_LIMIT_PER_HOUR": "5"          // max emails per client, recipient and template per hour (failed sends excluded)
+    "RECIPIENT_LIMIT_PER_HOUR": "5",         // max emails per client, recipient and template per hour (failed sends excluded)
+    "VAPID_PUBLIC_KEY": "",                  // Web Push public key, base64url — empty = push off (npm run push:keys)
+    "VAPID_SUBJECT": "",                     // mailto: or https: contact the push services may use — empty = push off
+    "PUSH_LIMIT_PER_HOUR": "60"              // max pushes per client, user and conversation per hour (failed sends excluded)
   },
 
   // Secrets: values are NOT stored here. Set each one with `npx wrangler secret put <NAME>`
@@ -89,6 +98,7 @@
   //   SMTP_FROM_EMAIL  sender address — with Gmail, the same account as SMTP_USERNAME
   //   SMTP_FROM_NAME   sender display name
   //   ADMIN_SETUP_TOKEN  one-time token for the first /admin registration (any long random string)
+  //   VAPID_PRIVATE_KEY  optional, Web Push private key from `npm run push:keys` — empty = push off
   "secrets": {
     "required": ["SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "SMTP_FROM_NAME", "ADMIN_SETUP_TOKEN"]
   }

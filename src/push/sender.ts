@@ -85,29 +85,29 @@ async function deliver(
   fetchPush: PushFetch,
 ): Promise<Outcome> {
   const body = await encryptPayload(payload, b64url.decode(sub.p256dh), b64url.decode(sub.auth));
+  // Signed once (the JWT is valid 12 h). Signing and D1 errors are not transient: they skip the retries.
+  const headers: Record<string, string> = {
+    TTL: "86400",
+    Urgency: "high",
+    "Content-Encoding": "aes128gcm",
+    "Content-Type": "application/octet-stream",
+    Authorization: await vapidAuthorization(sub.endpoint, keys),
+  };
+  if (tag) headers.Topic = tag;
   for (let attempt = 1; ; attempt++) {
-    let detail: string;
-    let transient = true;
+    let res: Response | undefined;
     try {
-      const headers: Record<string, string> = {
-        TTL: "86400",
-        Urgency: "high",
-        "Content-Encoding": "aes128gcm",
-        "Content-Type": "application/octet-stream",
-        Authorization: await vapidAuthorization(sub.endpoint, keys),
-      };
-      if (tag) headers.Topic = tag;
-      const res = await fetchPush(sub.endpoint, { method: "POST", headers, body, signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) });
-      if (res.ok) return "accepted";
-      if (res.status === 404 || res.status === 410) {
-        await deleteSubscription(env.DB, clientId, sub.endpoint);
-        return "gone";
-      }
-      detail = `HTTP ${res.status}`;
-      transient = res.status === 429 || res.status >= 500;
+      res = await fetchPush(sub.endpoint, { method: "POST", headers, body, signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) });
     } catch {
-      detail = "network"; // the error's message is not logged: it could name the endpoint
+      // network error or timeout; the error's message is not logged: it could name the endpoint
     }
+    if (res?.ok) return "accepted";
+    if (res && (res.status === 404 || res.status === 410)) {
+      await deleteSubscription(env.DB, clientId, sub.endpoint);
+      return "gone";
+    }
+    const transient = !res || res.status === 429 || res.status >= 500;
+    const detail = res ? `HTTP ${res.status}` : "network";
     await log(env.DB, { level: "warn", code: "push_attempt_failed", client_id: clientId, message_id: id, detail: `${detail} attempt ${attempt}/${MAX_ATTEMPTS}` });
     if (!transient || attempt === MAX_ATTEMPTS) return "failed";
     await sleep(BACKOFF_MS[attempt - 1]);

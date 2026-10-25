@@ -197,6 +197,15 @@ describe("POST /v1/push/send", () => {
     expect(await endpoints()).toEqual([E1]);
   });
 
+  it("does not retry or call the push service when signing fails", async () => {
+    const rec = pushRecorder();
+    const res = await send(BODY, rec, undefined, { ...pushEnv, VAPID_PRIVATE_KEY: "not-a-key" } as Env);
+    const body = await res.json<any>();
+    expect([res.status, body.error.code]).toEqual([502, "push_failed"]);
+    expect(rec.requests).toHaveLength(0);
+    expect((await logs(body.id)).filter((l) => l.code !== "push_failed")).toEqual([{ code: "push_device_error", level: "error", detail: null }]);
+  });
+
   it("never stores or logs content", async () => {
     const vars = { appName: "Piattaforma XX", sender: "Marco-SECRET" };
     await send({ ...BODY, variables: vars, url: "/chat/SECRET-URL" }, pushRecorder({ [E1]: [503] }));

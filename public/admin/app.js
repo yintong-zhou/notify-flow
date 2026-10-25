@@ -58,6 +58,7 @@ async function refresh() {
     renderErrors(stats.errors);
     await loadDeliveries(true);
     await loadLogs(true);
+    await loadClients();
     await loadTables();
   } catch (e) {
     showError(e);
@@ -180,6 +181,35 @@ const loadLogs = pager("logs", "#log-search", "#logs", "#more-logs", "logs", (l)
   if (l.ip) link(tr.children[7], () => showLogs("ip", l.ip));
   return tr;
 });
+
+async function loadClients() {
+  const { push_configured, clients } = await api("clients");
+  $("#push-hint").hidden = push_configured;
+  $("#clients tbody").replaceChildren(
+    ...clients.map((c) => {
+      const tr = row([c.name, c.id, time(c.created_at), c.push_devices, ""]);
+      const box = el("input");
+      box.type = "checkbox";
+      box.checked = c.push_enabled;
+      // Turning push off stays possible even when the service lost its VAPID settings.
+      box.disabled = !push_configured && !c.push_enabled;
+      box.setAttribute("aria-label", `Push for ${c.name}`);
+      box.addEventListener("change", async () => {
+        box.disabled = true;
+        try {
+          await api("client-push", { client_id: c.id, enabled: box.checked });
+          await loadClients();
+        } catch (e) {
+          box.checked = !box.checked;
+          box.disabled = !push_configured && !box.checked;
+          showError(e);
+        }
+      });
+      tr.lastChild.append(box);
+      return tr;
+    }),
+  );
+}
 
 onSubmit($("#setup-form"), async (values) => {
   await api("setup", values);

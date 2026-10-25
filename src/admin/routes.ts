@@ -1,4 +1,5 @@
 import { checkAdminLimit, checkIpLimit } from "../security/rate-limit";
+import { pushConfigured } from "../push/crypto";
 import { EMAIL_RE, invalid, readJson } from "../security/validation";
 import { HttpError } from "../types";
 import { CLEARED_COOKIE, createSession, hashPassword, requireSession, sameSecret, sessionHash, verifyPassword } from "./auth";
@@ -126,6 +127,30 @@ async function runSql(req: Request, env: Env): Promise<Response> {
   });
 }
 
+async function clients(_req: Request, env: Env): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    `SELECT id, name, created_at, push_enabled,
+       (SELECT COUNT(*) FROM push_subscriptions s WHERE s.client_id = clients.id) AS push_devices
+     FROM clients ORDER BY name`,
+  ).all<{ id: string; name: string; created_at: number; push_enabled: number; push_devices: number }>();
+  return Response.json({
+    push_configured: pushConfigured(env),
+    clients: results.map((c) => ({ ...c, push_enabled: c.push_enabled === 1 })),
+  });
+}
+
+/** Turning push off always works, even when the VAPID settings were removed; turning it on needs them. */
+async function clientPush(req: Request, env: Env): Promise<Response> {
+  requireJson(req);
+  const { client_id, enabled } = await readJson(req);
+  if (typeof client_id !== "string" || !client_id || client_id.length > 128) invalid("client_id must be a client id");
+  if (typeof enabled !== "boolean") invalid("enabled must be a boolean");
+  if (enabled && !pushConfigured(env)) throw new HttpError(409, "push_not_configured", "Web Push is not configured on this service");
+  const { meta } = await env.DB.prepare("UPDATE clients SET push_enabled = ? WHERE id = ?").bind(enabled ? 1 : 0, client_id).run();
+  if (meta.changes === 0) throw new HttpError(404, "not_found", "Client not found");
+  return new Response(null, { status: 204 });
+}
+
 const ROUTES: Record<string, Record<string, Handler>> = {
   me: { GET: me },
   setup: { POST: setup },
@@ -136,6 +161,8 @@ const ROUTES: Record<string, Record<string, Handler>> = {
   deliveries: { GET: withSession(deliveries) },
   logs: { GET: withSession(logs) },
   sql: { POST: withSession(runSql) },
+  clients: { GET: withSession(clients) },
+  "client-push": { POST: withSession(clientPush) },
 };
 
 /** `/admin/api/<route>`: the dashboard's JSON API. A session cookie authenticates it, never an API key. */

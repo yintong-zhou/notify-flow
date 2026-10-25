@@ -24,6 +24,16 @@ Never ask for permission on page load. Do it from a button:
 // Your backend relays GET /v1/push/public-key on its own route: it answers {"publicKey": <public_key>}.
 const toKey = (b64) => Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 
+// Your backend calls PUT /v1/push/subscriptions with the logged-in user's id.
+async function register(subscription) {
+  const r = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(subscription.toJSON()),
+  });
+  if (!r.ok) throw new Error(`push registration failed (${r.status})`);
+}
+
 async function enablePush() {
   if ((await Notification.requestPermission()) !== "granted") return;
   const { publicKey } = await (await fetch("/api/push/key")).json();
@@ -32,12 +42,7 @@ async function enablePush() {
     userVisibleOnly: true,
     applicationServerKey: toKey(publicKey),
   });
-  // Your backend calls PUT /v1/push/subscriptions with the logged-in user's id.
-  await fetch("/api/push/subscribe", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(subscription.toJSON()),
-  });
+  await register(subscription);
 }
 ```
 
@@ -54,9 +59,9 @@ app.post("/api/push/subscribe", requireLogin, async (req, res) => {
 });
 ```
 
-## 2. On every app start
+## 2. On app start and after login
 
-Safari can revoke a subscription, and changing the keys invalidates all of them. When permission is already granted, check the subscription at start-up and register again if needed. A repeated registration is harmless.
+Safari can revoke a subscription, and changing the keys invalidates all of them. When permission is already granted, check the subscription and register it again. Call this **only with a logged-in session**: on app start, and right after login (the backend answers `401` otherwise, and nothing would be registered). A current subscription is still sent to your backend: the upsert moves the endpoint to the logged-in user, so a device shared by two accounts always notifies the one who is signed in. A repeated registration is harmless.
 
 ```js
 async function ensureSubscribed() {
@@ -66,7 +71,7 @@ async function ensureSubscribed() {
   const current = await registration.pushManager.getSubscription();
   const same = current && btoa(String.fromCharCode(...new Uint8Array(current.options.applicationServerKey)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") === publicKey;
-  if (same) return;
+  if (same) return register(current);
   await current?.unsubscribe();
   await enablePush();
 }
@@ -74,22 +79,24 @@ async function ensureSubscribed() {
 
 ## 3. On logout
 
-The backend deletes the device, then the page drops the browser's subscription:
+The page reads the endpoint, tells the backend, then drops the browser's subscription:
 
 ```js
+// page
+const subscription = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+const endpoint = subscription?.endpoint;
+await subscription?.unsubscribe();
+if (endpoint) await fetch("/api/push/unsubscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint }) });
+
 // backend, with the endpoint sent by the page
 await fetch(`${process.env.NOTIFY_FLOW_URL}/v1/push/subscriptions`, {
   method: "DELETE",
   headers: { Authorization: `Bearer ${process.env.NOTIFY_FLOW_API_KEY}`, "Content-Type": "application/json" },
   body: JSON.stringify({ endpoint }),
 });
-
-// page
-const subscription = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
-await subscription?.unsubscribe();
 ```
 
-On account deletion send `{"user_id": "…"}` instead, to remove every device. This call works even when push is switched off.
+`DELETE` by endpoint is scoped per client, not per user: your backend should only delete an endpoint that the session user registered (keep a record), or send `{"user_id": "…"}` to remove all of that user's devices (also on account deletion). These calls work even when push is switched off.
 
 ## 4. The service worker
 
@@ -98,7 +105,11 @@ On account deletion send `{"user_id": "…"}` instead, to remove every device. T
 ```js
 // sw.js
 self.addEventListener("push", (event) => {
-  const { title, body, url, tag } = event.data.json();
+  let message = {};
+  try {
+    message = event.data.json();
+  } catch {} // empty or non-JSON payload: still show something, or Safari revokes the subscription
+  const { title = "New notification", body, url, tag } = message;
   event.waitUntil(
     self.registration.showNotification(title, {
       body,

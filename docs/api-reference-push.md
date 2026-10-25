@@ -10,7 +10,7 @@ A notification carries no user-written text. It is a title and a short body rend
 
 Every `/v1/push/*` route goes through the usual checks (per-IP limit, API key), then:
 
-- **Per-client limit:** `/v1/push/*` has its own limit, 600 per 60 s per client, so chat traffic never causes a `429` on email. The per-IP limit is 600 per 60 s.
+- **Per-client limit:** `/v1/push/*` has its own limit, 600 per 60 s per client, so the push and email budgets of a client are separate. The per-IP limit of 600 per 60 s is shared with email: if one backend spends its whole push budget from one IP, its emails can still hit it, so raise the IP limit when your traffic needs it.
 - **`404 not_found` / `405 method_not_allowed`:** unknown routes and methods answer before the two checks below.
 - **`503 push_not_configured`:** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` or `VAPID_SUBJECT` is empty.
 - **`403 push_disabled`:** push is not enabled for your client.
@@ -102,7 +102,7 @@ The payload the device receives is `title` and `body`, plus `url` and `tag` when
 
 | Status | Body |
 |---|---|
-| `200` | `{"id":"psh_…","status":"submitted","devices":2}`: a push service accepted the message for that many devices. It does not prove anyone saw it |
+| `200` | `{"id":"psh_…","status":"submitted","devices":2}`: a push service accepted the message for that many devices. It does not prove anyone saw it. A replayed `Idempotency-Key` returns the stored result instead, whose `status` may also be `failed` or `processing` |
 | `404` | `no_subscriptions`: the user has no registered device. No record is written and there is no `id`. If every device turned out to be gone, the error carries `id` |
 | `429` | `rate_limited` |
 | `502` | `push_failed`, with `id`: no push service accepted the notification |

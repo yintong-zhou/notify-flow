@@ -86,7 +86,7 @@ Every error has the same shape:
 { "error": { "code": "template_not_found", "message": "Template \"welcome\" not found" } }
 ```
 
-`502` and `503` also carry the delivery id at the top level: `{ "error": { … }, "id": "msg_…" }`. The push errors `404 no_subscriptions` (when every device was gone) and `502 push_failed` carry a `psh_…` id the same way.
+`502` and `503` also carry the delivery id at the top level: `{ "error": { … }, "id": "msg_…" }` (except `503 push_not_configured`, which carries none). The push errors `404 no_subscriptions` (when every device was gone) and `502 push_failed` carry a `psh_…` id the same way.
 
 | Status | Code | When |
 |---|---|---|
@@ -95,9 +95,9 @@ Every error has the same shape:
 | 400 | `unsupported_push_service` | Push only: the subscription endpoint is not on a supported push service |
 | 400 | `invalid_variables` | The variables don't match the template's list. The message lists `missing` and `unexpected` names |
 | 401 | `unauthorized` | Missing or invalid API key |
+| 403 | `push_disabled` | Push only: the operator has not enabled push for your client |
 | 404 | `not_found` | Unknown route, or an email id that is unknown or belongs to another client |
 | 404 | `template_not_found` | The template exists neither in the locale nor in `en`. On `PUT /v1/events/:event`: in no locale |
-| 403 | `push_disabled` | Push only: the operator has not enabled push for your client |
 | 404 | `event_not_found` | No mapping of yours and no built-in for the event |
 | 404 | `no_subscriptions` | Push only: the user has no registered device |
 | 405 | `method_not_allowed` | The message lists the allowed methods |

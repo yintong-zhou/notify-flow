@@ -129,8 +129,8 @@ Copyable code for the platform. Nothing here runs in notify-flow.
    - `Notification.requestPermission()`;
    - then `pushManager.subscribe({userVisibleOnly: true, applicationServerKey})`;
    - then send `subscription.toJSON()` to the platform's own backend, which calls `PUT /v1/push/subscriptions`.
-3. **On every app start** with permission granted, check `getSubscription()`. If it is null, or its `options.applicationServerKey` differs from the current public key, unsubscribe, subscribe and register again. This covers Safari revocations and key rotation, and a repeated registration is harmless.
-4. **On logout:** the backend calls `DELETE {endpoint}`, then the page calls `subscription.unsubscribe()`.
+3. **On app start and right after login**, only with a logged-in session and permission granted, check `getSubscription()`. If it is null, or its `options.applicationServerKey` differs from the current public key, unsubscribe, subscribe and register again. If it is current, still send it to the platform backend: the upsert moves the endpoint to the logged-in user (an account switch without logout, or a start-up before login, would otherwise leave it with the wrong user or unregistered). The page checks the backend's `r.ok`. This also covers Safari revocations and key rotation, and a repeated registration is harmless.
+4. **On logout:** the page reads `subscription.endpoint` before `unsubscribe()` and sends it to the backend, which calls `DELETE {endpoint}` (scoped per client, not per user: the backend only deletes an endpoint the session user registered, or uses `{user_id}` to remove all of that user's devices).
 5. **Service worker:**
    - on `push`: `event.waitUntil(showNotification(title, {body, tag, renotify: !!tag, icon, data: {url}}))`, **always**;
    - on `notificationclick`: focus an open window on that URL, otherwise `clients.openWindow(url ?? "/")`.

@@ -37,7 +37,7 @@
       "simple": { "limit": 60, "period": 60 } // requests per period; period must be 10 or 60 seconds
     },
     // Per-IP limit on every /v1/* route (email and push), checked before the API key: caps anonymous traffic hitting D1.
-    // Keep it above 60 x the number of clients that share one egress IP.
+    // Keep it above 60 per client plus 600 per push-enabled client that share one egress IP (push has its own 600 per client budget).
     {
       "name": "IP_RATE_LIMITER",             // name used in code — do not change
       "namespace_id": "1002",
@@ -55,7 +55,7 @@
       "namespace_id": "1004",
       "simple": { "limit": 30, "period": 60 }
     },
-    // Per-client limit on /v1/push/*, separate so chat traffic never blocks email.
+    // Per-client limit on /v1/push/*, separate from the email client limit (the per-IP limit above is shared).
     {
       "name": "PUSH_RATE_LIMITER",           // name used in code — do not change
       "namespace_id": "1005",

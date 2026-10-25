@@ -58,8 +58,8 @@ async function refresh() {
     renderErrors(stats.errors);
     await loadDeliveries(true);
     await loadLogs(true);
-    await loadClients();
     await loadTables();
+    await loadClients();
   } catch (e) {
     showError(e);
   }

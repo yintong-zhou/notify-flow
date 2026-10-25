@@ -97,10 +97,13 @@ async function deliver(
   for (let attempt = 1; ; attempt++) {
     let res: Response | undefined;
     try {
-      res = await fetchPush(sub.endpoint, { method: "POST", headers, body, signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) });
+      // redirect: "manual": a 3xx must not re-send the payload to a URL outside the allowlist (it counts as a permanent failure).
+      res = await fetchPush(sub.endpoint, { method: "POST", headers, body, redirect: "manual", signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) });
     } catch {
       // network error or timeout; the error's message is not logged: it could name the endpoint
     }
+    // Only the status is used: release the connection (Workers allows 6 at once). A cancel failure is ignored.
+    await res?.body?.cancel().catch(() => {});
     if (res?.ok) return "accepted";
     if (res && (res.status === 404 || res.status === 410)) {
       await deleteSubscription(env.DB, clientId, sub.endpoint);

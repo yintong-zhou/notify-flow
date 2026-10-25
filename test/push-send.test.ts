@@ -57,6 +57,7 @@ describe("POST /v1/push/send", () => {
     expect(result).toEqual({ id: expect.stringMatching(/^psh_/), status: "submitted", devices: 2 });
     expect(rec.requests).toHaveLength(2);
     for (const request of rec.requests) {
+      expect(request.redirect).toBe("manual");
       expect(request.headers.get("TTL")).toBe("86400");
       expect(request.headers.get("Urgency")).toBe("high");
       expect(request.headers.get("Topic")).toBe("chat-42");
@@ -194,6 +195,14 @@ describe("POST /v1/push/send", () => {
     const body = await res.json<any>();
     expect([res.status, body.error.code]).toEqual([502, "push_failed"]);
     expect((await deliveries())[0]).toMatchObject({ id: body.id, status: "failed", error_code: "push_failed" });
+    expect(await endpoints()).toEqual([E1]);
+  });
+
+  it("treats a redirect as a permanent failure: one attempt, subscription kept", async () => {
+    const rec = pushRecorder({ [E1]: [307] });
+    const res = await send(BODY, rec);
+    expect([res.status, await code(res)]).toEqual([502, "push_failed"]);
+    expect(rec.requests).toHaveLength(1);
     expect(await endpoints()).toEqual([E1]);
   });
 

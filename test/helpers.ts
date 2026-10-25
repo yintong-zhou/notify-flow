@@ -76,13 +76,13 @@ export function pushCall(path: string, init: CallInit = {}, fetchPush: PushFetch
  */
 export function pushRecorder(script: Record<string, Array<number | Error>> = {}): {
   fetch: PushFetch;
-  requests: { url: string; headers: Headers; body: Uint8Array }[];
+  requests: { url: string; headers: Headers; body: Uint8Array; redirect?: RequestInit["redirect"] }[];
 } {
-  const requests: { url: string; headers: Headers; body: Uint8Array }[] = [];
+  const requests: { url: string; headers: Headers; body: Uint8Array; redirect?: RequestInit["redirect"] }[] = [];
   return {
     requests,
     fetch: async (url, init) => {
-      requests.push({ url, headers: new Headers(init.headers), body: init.body as Uint8Array });
+      requests.push({ url, headers: new Headers(init.headers), body: init.body as Uint8Array, redirect: init.redirect });
       const outcome = script[url]?.shift() ?? 201;
       if (outcome instanceof Error) throw outcome;
       return new Response(null, { status: outcome });

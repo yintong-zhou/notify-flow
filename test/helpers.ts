@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { handle } from "../src/index";
+import { b64url, deriveKeys } from "../src/push/crypto";
 import type { MailMessage, SendMailFn } from "../src/smtp/smtp-client";
 import type { Locale, Template } from "../src/types";
 
@@ -96,4 +97,30 @@ export async function setupAdmin(): Promise<string> {
   });
   if (res.status !== 201) throw new Error(`setup failed: ${res.status}`);
   return sessionCookie(res);
+}
+
+/** A browser's push subscription keys: an ECDH P-256 pair and a 16-byte auth secret, base64url-encoded. */
+export async function browserKeys(): Promise<{ privateKey: CryptoKey; p256dh: string; auth: string }> {
+  const pair = (await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"])) as CryptoKeyPair;
+  return {
+    privateKey: pair.privateKey,
+    p256dh: b64url.encode(new Uint8Array((await crypto.subtle.exportKey("raw", pair.publicKey)) as ArrayBuffer)),
+    auth: b64url.encode(crypto.getRandomValues(new Uint8Array(16))),
+  };
+}
+
+/** What a browser does with an aes128gcm push body: derive the keys, decrypt, strip the 0x02 delimiter. */
+export async function decryptPush(body: Uint8Array, browser: { privateKey: CryptoKey; auth: string }): Promise<string> {
+  const salt = body.slice(0, 16);
+  const asPublic = body.slice(21, 86);
+  const asKey = await crypto.subtle.importKey("raw", asPublic, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const algorithm = { name: "ECDH", public: asKey } as SubtleCryptoDeriveKeyAlgorithm; // the Workers types call it `$public`
+  const ecdh = new Uint8Array(await crypto.subtle.deriveBits(algorithm, browser.privateKey, 256));
+  // The pair is extractable, so the browser's own public point comes from the private JWK.
+  const jwk = (await crypto.subtle.exportKey("jwk", browser.privateKey)) as JsonWebKey;
+  const uaPublic = Uint8Array.of(4, ...b64url.decode(jwk.x!), ...b64url.decode(jwk.y!));
+  const { cek, nonce } = await deriveKeys(ecdh, b64url.decode(browser.auth), uaPublic, asPublic, salt);
+  const key = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["decrypt"]);
+  const plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, key, body.slice(86)));
+  return new TextDecoder().decode(plain.slice(0, -1));
 }

@@ -1,6 +1,7 @@
-import { invalid } from "../security/validation";
-import { HttpError } from "../types";
+import { invalid, NAME_RE } from "../security/validation";
+import { HttpError, isLocale } from "../types";
 import { b64url } from "./crypto";
+import type { PushRequest } from "./sender";
 import type { Subscription } from "./subscriptions";
 
 // Hosts a push service may use. The endpoint is fetched server-side, so anything else is an SSRF risk.
@@ -71,4 +72,37 @@ export function parseUnsubscribe(body: Record<string, unknown>): { endpoint: str
   }
   if (body.user_id !== undefined && body.endpoint === undefined) return { userId: parseUserId(body.user_id) };
   return invalid("Send exactly one of endpoint or user_id");
+}
+
+const TAG_RE = /^[A-Za-z0-9_-]{1,32}$/;
+
+/** `url` is a path on the platform's own site (the service worker resolves it against its origin), never another site. */
+function parseUrl(raw: unknown): string {
+  if (typeof raw !== "string" || raw.length < 1 || raw.length > 512 || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\") || CONTROL_CHARS.test(raw)) {
+    invalid("url must be a path of 1-512 characters starting with a single /");
+  }
+  return raw;
+}
+
+function parseVariables(raw: unknown): Record<string, string> {
+  // Short single-line values keep message text out of the request mechanically.
+  if (!isObject(raw) || !Object.values(raw).every((v) => typeof v === "string" && v.length >= 1 && v.length <= 64 && !CONTROL_CHARS.test(v))) {
+    invalid("variables must be an object of strings of 1-64 characters without control characters");
+  }
+  return raw as Record<string, string>;
+}
+
+export function parsePushRequest(body: Record<string, unknown>): PushRequest {
+  const userId = parseUserId(body.user_id);
+  const { template, url, tag } = body;
+  if (typeof template !== "string" || !NAME_RE.test(template)) invalid("template must match ^[a-z0-9-]{1,64}$");
+  const locale = body.locale ?? "en";
+  if (!isLocale(locale)) invalid("locale must be one of it, en, pt-BR");
+  const request: PushRequest = { userId, template, locale, variables: parseVariables(body.variables) };
+  if (url !== undefined) request.url = parseUrl(url);
+  if (tag !== undefined) {
+    if (typeof tag !== "string" || !TAG_RE.test(tag)) invalid("tag must match ^[A-Za-z0-9_-]{1,32}$");
+    request.tag = tag;
+  }
+  return request;
 }

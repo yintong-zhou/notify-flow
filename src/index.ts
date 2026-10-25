@@ -1,5 +1,6 @@
 import { purgeSessions } from "./admin/auth";
 import { handleAdmin } from "./admin/routes";
+import { purgePushDeliveries } from "./push/sender";
 import { handlePush, type PushFetch } from "./push/routes";
 import { getEmail, sendEmail } from "./routes/email";
 import { deleteEvent, getEvent, listEvents, putEvent } from "./routes/events";
@@ -101,6 +102,6 @@ async function errorResponse(req: Request, env: Env, e: unknown, clientId?: stri
 
 export default {
   fetch: (req, env, ctx) => handle(req, env, sendMail, ctx),
-  scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.all([purgeDeliveries(env.DB), purgeSessions(env.DB), purgeLogs(env.DB)])),
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.all([purgeDeliveries(env.DB), purgePushDeliveries(env.DB), purgeSessions(env.DB), purgeLogs(env.DB)])),
   queue: (batch, env) => handleQueue(batch, env, sendMail),
 } satisfies ExportedHandler<Env, QueuedEmail>;

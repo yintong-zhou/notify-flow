@@ -70,6 +70,26 @@ export function pushCall(path: string, init: CallInit = {}, fetchPush: PushFetch
   return handle(apiRequest(path, init), testEnv, async () => {}, undefined, fetchPush);
 }
 
+/**
+ * A push service that records every request. `script` maps an endpoint to its next outcomes, consumed one per call:
+ * a number answers with that status, an Error rejects; an empty script answers 201.
+ */
+export function pushRecorder(script: Record<string, Array<number | Error>> = {}): {
+  fetch: PushFetch;
+  requests: { url: string; headers: Headers; body: Uint8Array }[];
+} {
+  const requests: { url: string; headers: Headers; body: Uint8Array }[] = [];
+  return {
+    requests,
+    fetch: async (url, init) => {
+      requests.push({ url, headers: new Headers(init.headers), body: init.body as Uint8Array });
+      const outcome = script[url]?.shift() ?? 201;
+      if (outcome instanceof Error) throw outcome;
+      return new Response(null, { status: outcome });
+    },
+  };
+}
+
 /** A SendMailFn that records every attempt and throws the queued failures in order (falsy = succeed). */
 export function recorder(...failures: unknown[]): { send: SendMailFn; messages: MailMessage[] } {
   const messages: MailMessage[] = [];

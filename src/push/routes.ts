@@ -1,8 +1,9 @@
-import { readJson } from "../security/validation";
+import { parseIdempotencyKey, readJson } from "../security/validation";
 import { HttpError } from "../types";
 import { pushConfigured, vapidKeys } from "./crypto";
+import { sendPush } from "./sender";
 import { removeSubscriptions, upsertSubscription } from "./subscriptions";
-import { parseSubscription, parseUnsubscribe } from "./validation";
+import { parsePushRequest, parseSubscription, parseUnsubscribe } from "./validation";
 
 export type PushFetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -32,8 +33,19 @@ const deleteSubscriptions: Handler = async (req, env, clientId) => {
   return new Response(null, { status: 204 });
 };
 
+const send: Handler = async (req, env, clientId, fetchPush, ctx) => {
+  const idempotencyKey = parseIdempotencyKey(req); // before the body, so a bad key is rejected without reading it
+  const request = parsePushRequest(await readJson(req));
+  const requestId = req.headers.get("cf-ray") ?? crypto.randomUUID();
+  const result = sendPush(env, clientId, request, { idempotencyKey, requestId }, fetchPush);
+  // Keep the send (and its status UPDATE) running if the caller disconnects before it finishes.
+  ctx?.waitUntil(result.catch(() => {}));
+  return Response.json(await result);
+};
+
 const ROUTES: Record<string, Record<string, Handler>> = {
   "public-key": { GET: withGates(publicKey) },
+  send: { POST: withGates(send) },
   subscriptions: { PUT: withGates(putSubscription), DELETE: deleteSubscriptions },
 };
 

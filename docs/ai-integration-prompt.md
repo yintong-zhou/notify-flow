@@ -60,6 +60,14 @@ Optional variants. Use the plain synchronous `/v1/email/send` unless I ask for o
 - **Async:** add `Prefer: respond-async`. The answer is `202 {"id","status":"queued"}`, and the service retries SMTP up to 5 times over about 50 minutes. Read the outcome with `GET /v1/email/{id}`. On `503 queue_unavailable`, retry later with the SAME key.
 - **By event:** `POST /v1/notifications` with `{"event":"auth.password_reset","recipient":{"email":"…","locale":"it"},"data":{…}}`. The service picks the template mapped to the event. Responses, limits and Idempotency-Key are the same, and a key is shared with `/v1/email/send`. Remap events with `PUT /v1/events/{event}` and `{"template":"…"}`.
 
+Web Push (opt-in: the notify-flow operator must enable it for this app, otherwise `503 push_not_configured` or `403 push_disabled`). Use it only if I ask for push notifications:
+- `GET /v1/push/public-key` → `{"public_key"}`, the `applicationServerKey` for the browser.
+- `PUT /v1/push/subscriptions` with `{"user_id","subscription"}` (the browser's `PushSubscription.toJSON()`) → `204`. `user_id` is 1-128 characters. Only the 10 newest devices per user are kept. `400 unsupported_push_service` for an unknown push host.
+- `DELETE /v1/push/subscriptions` with exactly one of `{"endpoint"}` or `{"user_id"}` → `204`. It works even when push is off.
+- `POST /v1/push/send` with `{"user_id","template":"new-message","locale","variables":{"appName","sender"},"url":"/chat/42","tag":"chat-42"}` (`url` and `tag` optional, `tag` is `^[A-Za-z0-9_-]{1,32}$`, `url` is a path starting with a single `/`). Each variable value is 1-64 characters. Same `Idempotency-Key` rules. Success: `200 {"id":"psh_…","status":"submitted","devices":n}`. `404 no_subscriptions` means the user has no device: ignore it. `429` means drop the push. `502 push_failed` is not worth retrying. A notification carries no user-written text.
+- Limits: 600 requests per minute per app on `/v1/push/*` (separate from the email limit), and 60 pushes per hour per user and conversation.
+- Do not send a push when the user already has that conversation open and focused: use the app's realtime channel only. The service worker must always call `showNotification` in its `push` handler.
+
 ## Procedure
 
 ### 1. Analysis (without asking me anything)

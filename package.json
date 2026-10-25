@@ -10,6 +10,7 @@
     "db:migrate:local": "wrangler d1 migrations apply notify-flow --local",
     "db:migrate:remote": "wrangler d1 migrations apply notify-flow --remote",
     "client:create": "node scripts/create-client.mjs",
+    "push:keys": "node scripts/vapid-keys.mjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"

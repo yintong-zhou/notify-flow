@@ -83,6 +83,8 @@ A web app sends email in three steps:
 
 The **[web app integration guide](docs/web-app-integration.md)** covers the details: architecture, Node.js and Python clients, password reset and sign-up flows, custom templates, retry rules, [asynchronous sending](docs/web-app-integration-async.md) and a production checklist.
 
+**Web Push** is optional and opt-in per client: notify-flow can also send Web Push notifications (a title and a short body from a built-in template, with no user-written text). See the [Web Push guide](https://notify-flow-docs.pages.dev/web-app-integration-push).
+
 ## Admin dashboard
 
 The Worker also serves a monitoring page at `/admin/`: delivery stats and search, a log of errors and rejected requests, and a SQL console on the D1 database. There is one admin account, registered on the first visit with the `ADMIN_SETUP_TOKEN` secret and kept separate from client API keys. The **[admin dashboard guide](docs/admin-dashboard.md)** covers setup, upgrades of an existing deployment, and what each section shows.
@@ -143,7 +145,7 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 <!-- #region security -->
 - **Per-client API keys**, stored only as SHA-256 hashes.
 - **Idempotency:** retrying a request with the same `Idempotency-Key` never sends a duplicate email.
-- **Rate limits:** 300 requests per minute per IP (checked before the API key), 60 per minute per client, and `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template for each client. Failed sends do not count.
+- **Rate limits:** 600 requests per minute per IP (checked before the API key), 60 per minute per client, and `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template for each client. Failed sends do not count.
 - **No secrets in logs:** delivery records and logs never contain variables, tokens, reset URLs or SMTP credentials.
 <!-- #endregion security -->
 
@@ -152,7 +154,8 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 ```text
 src/
 ├── index.ts       # Worker entry point and router
-├── admin/         # dashboard API: setup, login, sessions, stats, logs, SQL
+├── admin/         # dashboard API: setup, login, sessions, stats, logs, SQL, clients
+├── push/          # Web Push: VAPID and encryption, subscriptions, sender
 ├── routes/        # email, notifications, events, templates, health
 ├── security/      # auth, payload validation, rate limiting
 ├── services/      # email-service (idempotency, retries, delivery log), queue-consumer (async sends), logger (app_logs)
@@ -161,7 +164,7 @@ src/
 └── types/
 public/admin/      # dashboard pages, served as static assets
 migrations/        # D1 schema
-scripts/           # create-client.mjs
+scripts/           # create-client.mjs, vapid-keys.mjs
 test/              # vitest, runs inside workerd
 docs/              # docs site (VitePress): guides, API Reference; specs and plans are not published
 ```
@@ -193,4 +196,3 @@ These items come from the spec and are planned after the MVP:
 - HMAC request signing (`X-Client-Id`, `X-Timestamp`, `X-Signature`)
 - OAuth2 / XOAUTH2 for Google Workspace and Microsoft 365
 - Encrypted per-tenant SMTP credentials stored in a database
-- Web Push notifications

@@ -104,6 +104,7 @@ describe("registering", () => {
     }
     for (const endpoint of [
       "http://fcm.googleapis.com/x",
+      "https://fcm.googleapis.com:443/x",
       "https://fcm.googleapis.com:8443/x",
       "https://u:p@fcm.googleapis.com/x",
       "not a url",

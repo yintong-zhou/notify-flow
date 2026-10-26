@@ -23,7 +23,10 @@ function parseEndpoint(raw: unknown): string {
   } catch {
     invalid("subscription.endpoint must be a URL");
   }
-  if (url.protocol !== "https:" || url.port || url.username || url.password) {
+  // URL normalizes the default HTTPS port away (`:443` becomes an empty `url.port`),
+  // so inspect the original authority as well to enforce the no-explicit-port contract.
+  const authority = raw.match(/^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i)?.[1] ?? "";
+  if (url.protocol !== "https:" || url.port || /:\d+$/.test(authority) || url.username || url.password) {
     invalid("subscription.endpoint must be an https URL without port or credentials");
   }
   if (!PUSH_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`))) {

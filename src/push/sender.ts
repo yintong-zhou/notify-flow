@@ -30,12 +30,23 @@ export interface PushResult {
 
 type Outcome = "accepted" | "gone" | "failed";
 
+/** The stored result for an Idempotency-Key. A `processing` row created more than ABANDONED_AFTER_S ago is closed as failed. */
 async function findReplay(db: D1Database, clientId: string, key: string | null): Promise<PushResult | null> {
   if (key === null) return null;
-  return db
-    .prepare("SELECT id, status, devices FROM push_deliveries WHERE client_id = ? AND idempotency_key = ?")
-    .bind(clientId, key)
-    .first<PushResult>();
+  const row = await db
+    .prepare("SELECT id, status, devices, created_at < unixepoch() - ? AS abandoned FROM push_deliveries WHERE client_id = ? AND idempotency_key = ?")
+    .bind(ABANDONED_AFTER_S, clientId, key)
+    .first<PushResult & { abandoned: number }>();
+  if (!row) return null;
+  if (row.status === "processing" && row.abandoned) {
+    // The send died midway (e.g. the runtime was cancelled). The push may or may not have gone out.
+    await db
+      .prepare("UPDATE push_deliveries SET status = 'failed', error_code = 'abandoned' WHERE id = ? AND status = 'processing'")
+      .bind(row.id)
+      .run();
+    return { id: row.id, status: "failed", devices: row.devices };
+  }
+  return { id: row.id, status: row.status, devices: row.devices };
 }
 
 /**

@@ -132,6 +132,25 @@ describe("POST /v1/push/send", () => {
     expect(rec.requests).toHaveLength(1);
   });
 
+  it("closes an abandoned processing row on replay, but not a recent one", async () => {
+    const insert = (rowId: string, k: string, age: number) =>
+      env.DB.prepare(
+        "INSERT INTO push_deliveries (id, request_id, client_id, idempotency_key, template, user_id, status, created_at) VALUES (?, 'r', ?, ?, 'new-message', 'u1', 'processing', unixepoch() - ?)",
+      )
+        .bind(rowId, id, k, age)
+        .run();
+    await insert("psh_replay_stuck", "k-stuck", 301);
+    await insert("psh_replay_live", "k-live", 0);
+    const rec = pushRecorder();
+    expect(await (await send(BODY, rec, { "Idempotency-Key": "k-stuck" })).json()).toEqual({ id: "psh_replay_stuck", status: "failed", devices: 0 });
+    expect(await (await send(BODY, rec, { "Idempotency-Key": "k-live" })).json()).toEqual({ id: "psh_replay_live", status: "processing", devices: 0 });
+    expect(rec.requests).toHaveLength(0);
+    expect((await deliveries()).map((r) => [r.id, r.status, r.error_code])).toEqual([
+      ["psh_replay_stuck", "failed", "abandoned"],
+      ["psh_replay_live", "processing", null],
+    ]);
+  });
+
   it("limits pushes per user and conversation per hour", async () => {
     const limited = { ...pushEnv, PUSH_LIMIT_PER_HOUR: "2" } as Env;
     const sendTag = (tag: string | undefined, rec = pushRecorder()) => {

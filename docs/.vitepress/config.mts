@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "notify-flow",
-  description: "Self-hosted transactional email for Cloudflare Workers, over plain SMTP",
+  description: "Self-hosted transactional email over plain SMTP, plus opt-in Web Push, for Cloudflare Workers",
   cleanUrls: true,
   srcExclude: ["superpowers/**", "handoff/**", "requirements/**"],
   markdown: {

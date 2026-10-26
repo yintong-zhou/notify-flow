@@ -1,6 +1,6 @@
 # Admin dashboard
 
-The Worker serves a monitoring page at `/admin/`. It shows how many emails were submitted or failed, which errors happen most, a chart over time, and a search for single deliveries. It also lists logged errors and rejected requests, and has a SQL console on the D1 database. There is one admin account, created on the first visit.
+The Worker serves a monitoring page at `/admin/`. It shows how many emails were submitted or failed, which errors happen most, a chart over time, and a search for single deliveries. It also lists logged errors and rejected requests, has a SQL console on the D1 database, and switches Web Push on for each client. There is one admin account, created on the first visit.
 
 ## Set up
 
@@ -53,6 +53,30 @@ The **Database** section browses and changes the D1 database directly. Click a t
 - **Several statements** separated by `;` all run, but only the last one's rows are shown. They run as one unit: if one fails, none of them is applied.
 - **Duplicate column names** (`SELECT a.id, b.id …`) collapse into one: alias them (`b.id AS b_id`).
 - The SQL text and D1's error messages are never written to the logs: a failed statement is logged only as `sql_error`.
+
+## Clients
+
+The **Clients** section lists every client with its id, creation date, how many push devices it has registered, and a **Push** switch.
+
+- **Switch on:** the client can register devices and send push notifications ([Web Push](#web-push)). It needs the setup below, otherwise the switch is disabled and a hint links here (`409 push_not_configured` if you try anyway).
+- **Switch off:** keeps the registered devices. Registration and sending answer `403 push_disabled` until you switch it on again. Removing a user's devices (`DELETE /v1/push/subscriptions`) still works.
+- **Create clients** with `npm run client:create`: the dashboard never shows or creates API keys.
+
+## Web Push
+
+Push is opt-in: it does nothing until you complete these steps, and the rest of the service works without them. Callers use it as described in the [Web Push API reference](api-reference-push.md).
+
+1. Generate the VAPID key pair: `npm run push:keys`. It prints a public and a private key.
+2. In `wrangler.jsonc`, set the vars `VAPID_PUBLIC_KEY` (the public key) and `VAPID_SUBJECT` (a `mailto:` address or an `https:` URL that push services can contact).
+3. Store the private key: `npx wrangler secret put VAPID_PRIVATE_KEY`. For `npm run dev`, put `VAPID_PRIVATE_KEY=…` in `.dev.vars`. It is not a required secret, so a deployment without push still deploys.
+4. Apply the migrations: `npm run db:migrate:remote`.
+5. Deploy: `npm run deploy`.
+6. Open **Clients** and switch **Push** on for each client that should use it.
+
+`PUSH_LIMIT_PER_HOUR` (a var, default 60) caps pushes per client, user and conversation. Failed attempts are logged as `push_attempt_failed` (warn) and `push_device_error` (error), with the HTTP status or `network` but never the device endpoint or the text.
+
+> [!WARNING]
+> Do not rotate the VAPID keys unless they were compromised. Every browser subscription is tied to the public key, so after a rotation each user has to subscribe again (the [integration guide](web-app-integration-push.md) shows the start-up check that does it).
 
 ## Security
 

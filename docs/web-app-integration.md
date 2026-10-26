@@ -94,7 +94,7 @@ curl -X POST "$NOTIFY_FLOW_URL/v1/email/send" \
 
 Field rules and every error code: [API Reference](api-reference-email.md#post-v1-email-send). What to retry: [Errors, retries and idempotency](web-app-integration-flows.md#errors-retries-and-idempotency).
 
-For asynchronous sending (`202 Accepted`, `GET /v1/email/:id`), see [Asynchronous sending](web-app-integration-async.md). To send by event instead of by template name (`POST /v1/notifications`), see [Event-based sending](web-app-integration-events.md).
+For asynchronous sending (`202 Accepted`, `GET /v1/email/:id`), see [Asynchronous sending](web-app-integration-async.md). To send by event instead of by template name (`POST /v1/notifications`), see [Event-based sending](web-app-integration-events.md). To notify users on their phone or computer as well, see [Web Push](web-app-integration-push.md) (opt-in).
 
 ## Backend code examples
 

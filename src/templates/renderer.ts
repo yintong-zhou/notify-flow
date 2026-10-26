@@ -15,7 +15,7 @@ export function placeholders(source: string): string[] {
 }
 
 // Single pass: substituted values are never scanned again.
-function fill(source: string, vars: Record<string, string>, encode: (value: string) => string): string {
+export function fill(source: string, vars: Record<string, string>, encode: (value: string) => string): string {
   return source.replace(PLACEHOLDER, (_, name: string) => encode(Object.hasOwn(vars, name) ? vars[name] : ""));
 }
 
@@ -27,7 +27,7 @@ export function render(template: Template, vars: Record<string, string>): Render
   };
 }
 
-export function checkVariables(template: Template, vars: Record<string, string>): void {
+export function checkVariables(template: Pick<Template, "variables">, vars: Record<string, string>): void {
   const declared = new Set(template.variables);
   const missing = template.variables.filter((name) => !Object.hasOwn(vars, name));
   const unexpected = Object.keys(vars).filter((name) => !declared.has(name));

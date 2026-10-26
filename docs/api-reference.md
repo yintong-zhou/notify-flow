@@ -1,6 +1,6 @@
 # API Reference
 
-The full contract of the notify-flow REST API. For a guided walkthrough with code samples, see the [integration guide](web-app-integration.md). Endpoints: [sending](api-reference-email.md), and [events, templates and health](api-reference-config.md).
+The full contract of the notify-flow REST API. For a guided walkthrough with code samples, see the [integration guide](web-app-integration.md). Endpoints: [sending](api-reference-email.md), [events, templates and health](api-reference-config.md), and the opt-in [Web Push](api-reference-push.md).
 
 ## Base URL
 
@@ -70,11 +70,13 @@ Add `Prefer: respond-async` to a send. The preference name is case-insensitive, 
 
 | Limit | Scope | Default |
 |---|---|---|
-| Requests per IP | every `/v1/*` route, before the API key | 300 per 60 s |
-| Requests per client | every `/v1/*` route | 60 per 60 s |
+| Requests per IP | every `/v1/*` route, before the API key | 600 per 60 s |
+| Requests per client | every `/v1/*` route except `/v1/push/*` | 60 per 60 s |
+| Push requests per client | `/v1/push/*`, a separate budget so chat traffic never blocks email | 600 per 60 s |
 | Emails per recipient | per client, recipient and template, per hour; failed sends don't count | `RECIPIENT_LIMIT_PER_HOUR`, 5 |
+| Pushes per conversation | per client, user and tag (or template when untagged), per hour; failed sends don't count | `PUSH_LIMIT_PER_HOUR`, 60 |
 
-All three answer `429 rate_limited`. The administrator sets them in `wrangler.jsonc`.
+All of them answer `429 rate_limited`. The administrator sets them in `wrangler.jsonc`.
 
 ## Errors
 
@@ -84,23 +86,28 @@ Every error has the same shape:
 { "error": { "code": "template_not_found", "message": "Template \"welcome\" not found" } }
 ```
 
-`502` and `503` also carry the delivery id at the top level: `{ "error": { … }, "id": "msg_…" }`.
+`502` and `503` also carry the delivery id at the top level: `{ "error": { … }, "id": "msg_…" }` (except `503 push_not_configured`, which carries none). The push errors `404 no_subscriptions` (when every device was gone) and `502 push_failed` carry a `psh_…` id the same way.
 
 | Status | Code | When |
 |---|---|---|
 | 400 | `invalid_json` | The body is not valid JSON |
 | 400 | `validation_error` | A field, a path parameter or the `Idempotency-Key` breaks its rule. The message names it |
+| 400 | `unsupported_push_service` | Push only: the subscription endpoint is not on a supported push service |
 | 400 | `invalid_variables` | The variables don't match the template's list. The message lists `missing` and `unexpected` names |
 | 401 | `unauthorized` | Missing or invalid API key |
+| 403 | `push_disabled` | Push only: the operator has not enabled push for your client |
 | 404 | `not_found` | Unknown route, or an email id that is unknown or belongs to another client |
 | 404 | `template_not_found` | The template exists neither in the locale nor in `en`. On `PUT /v1/events/:event`: in no locale |
 | 404 | `event_not_found` | No mapping of yours and no built-in for the event |
+| 404 | `no_subscriptions` | Push only: the user has no registered device |
 | 405 | `method_not_allowed` | The message lists the allowed methods |
 | 413 | `payload_too_large` | Body over 256 KB, or async variables over 120 KB |
 | 429 | `rate_limited` | One of the [rate limits](#rate-limits) |
 | 500 | `smtp_misconfigured` | The SMTP vars or secrets are missing or invalid: tell the administrator |
 | 500 | `internal_error` | An unexpected error |
 | 502 | `smtp_failed` | The SMTP server refused the message, or never confirmed it (the message then says it may still be delivered). Temporary failures are retried, up to 3 attempts 0.5 s and 1 s apart; permanent refusals fail at once. Carries `id` |
+| 502 | `push_failed` | Push only: no push service accepted the notification. Carries `id` |
+| 503 | `push_not_configured` | Push only: the operator has not set the VAPID keys |
 | 503 | `queue_unavailable` | Async only: the message may not have reached the queue. Carries `id`; retry with the same `Idempotency-Key` |
 
 ## Delivery statuses

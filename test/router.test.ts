@@ -21,12 +21,15 @@ it("wrong method returns 405", async () => {
 });
 
 it("rate limits /v1/* per IP before checking the API key", async () => {
-  const req = () =>
-    handle(new Request("https://notify.test/v1/templates", { headers: { "CF-Connecting-IP": "203.0.113.7", "X-API-Key": "nf_wrong" } }), env);
-  for (let i = 0; i < 300; i++) expect((await req()).status).toBe(401);
-  const blocked = await req();
+  // A stub limiter: 600 real requests can straddle the limiter's 60 s window and reset its count.
+  const keys: string[] = [];
+  const IP_RATE_LIMITER = { limit: async ({ key }: { key: string }) => (keys.push(key), { success: false }) } as RateLimit;
+  const req = new Request("https://notify.test/v1/templates", { headers: { "CF-Connecting-IP": "203.0.113.7", "X-API-Key": "nf_wrong" } });
+  const blocked = await handle(req, { ...env, IP_RATE_LIMITER });
+  // A wrong key would answer 401: the 429 proves the IP check runs first.
   expect(blocked.status).toBe(429);
   expect((await blocked.json<any>()).error.code).toBe("rate_limited");
+  expect(keys).toEqual(["203.0.113.7"]);
 });
 
 it("rejects an oversized API key as invalid", async () => {

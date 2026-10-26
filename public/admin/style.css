@@ -76,6 +76,11 @@ tbody tr:hover { background: var(--card); }
 .level-error { color: var(--bad); font-weight: 600; }
 .level-warn { color: var(--warn); font-weight: 600; }
 
+/* Clients */
+#push-hint { margin-bottom: var(--s2); color: var(--muted); font-size: 13px; }
+#clients input[type="checkbox"] { height: auto; vertical-align: middle; }
+#clients td:nth-child(4), #clients th:nth-child(4) { text-align: right; }
+
 /* Database */
 .chips { display: flex; flex-wrap: wrap; gap: var(--s1); margin-bottom: var(--s2); }
 .chips button { height: 28px; font-size: 13px; }

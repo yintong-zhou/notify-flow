@@ -1,6 +1,6 @@
 # Notify Flow
 
-A self-hosted transactional email service for Cloudflare Workers. Your backends call one authenticated REST API, and notify-flow renders the email from a template and sends it over plain SMTP to Gmail, Microsoft 365 or any other SMTP server. It does not depend on Resend, SendGrid, Mailgun or similar platforms.
+A self-hosted transactional email service for Cloudflare Workers. Your backends call one authenticated REST API, and notify-flow renders the email from a template and sends it over plain SMTP to Gmail, Microsoft 365 or any other SMTP server. It does not depend on Resend, SendGrid, Mailgun or similar platforms. It can also send Web Push notifications to your users' phones and computers, opt-in per client.
 
 > [!NOTE]
 > The MVP is implemented: emails are sent by template name or by event, synchronously or asynchronously through Cloudflare Queues, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
@@ -83,9 +83,11 @@ A web app sends email in three steps:
 
 The **[web app integration guide](docs/web-app-integration.md)** covers the details: architecture, Node.js and Python clients, password reset and sign-up flows, custom templates, retry rules, [asynchronous sending](docs/web-app-integration-async.md) and a production checklist.
 
+**Web Push** is optional and opt-in per client: notify-flow can also notify a user's phone or computer while your app is closed, with a title and a short body from a built-in template, never user-written text. The operator sets the VAPID keys once and switches push on per client ([setup](docs/admin-dashboard.md#web-push)). Your backend then registers each device and calls `POST /v1/push/send`. The [Web Push guide](docs/web-app-integration-push.md) has the browser, service worker and backend code.
+
 ## Admin dashboard
 
-The Worker also serves a monitoring page at `/admin/`: delivery stats and search, a log of errors and rejected requests, and a SQL console on the D1 database. There is one admin account, registered on the first visit with the `ADMIN_SETUP_TOKEN` secret and kept separate from client API keys. The **[admin dashboard guide](docs/admin-dashboard.md)** covers setup, upgrades of an existing deployment, and what each section shows.
+The Worker also serves a monitoring page at `/admin/`: delivery stats and search, a log of errors and rejected requests, a SQL console on the D1 database, and a Clients panel with the per-client Web Push switch. There is one admin account, registered on the first visit with the `ADMIN_SETUP_TOKEN` secret and kept separate from client API keys. The **[admin dashboard guide](docs/admin-dashboard.md)** covers setup, upgrades of an existing deployment, and what each section shows.
 
 ## API
 
@@ -113,7 +115,7 @@ Content-Type: application/json
 { "id": "msg_…", "status": "submitted" }
 ```
 
-The **[API Reference](docs/api-reference.md)** documents every endpoint, field rule, error code and status: [sending](docs/api-reference-email.md), and [events, templates and health](docs/api-reference-config.md).
+The **[API Reference](docs/api-reference.md)** documents every endpoint, field rule, error code and status: [sending](docs/api-reference-email.md), [events, templates and health](docs/api-reference-config.md), and the opt-in [Web Push](docs/api-reference-push.md).
 
 ## SMTP configuration
 
@@ -142,9 +144,10 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 
 <!-- #region security -->
 - **Per-client API keys**, stored only as SHA-256 hashes.
-- **Idempotency:** retrying a request with the same `Idempotency-Key` never sends a duplicate email.
-- **Rate limits:** 300 requests per minute per IP (checked before the API key), 60 per minute per client, and `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template for each client. Failed sends do not count.
-- **No secrets in logs:** delivery records and logs never contain variables, tokens, reset URLs or SMTP credentials.
+- **Idempotency:** retrying a request with the same `Idempotency-Key` never sends a duplicate email or push.
+- **Rate limits:** 600 requests per minute per IP (checked before the API key), 60 per minute per client (600 on `/v1/push/*`, a separate budget), `RECIPIENT_LIMIT_PER_HOUR` (default 5) emails per recipient and template for each client, and `PUSH_LIMIT_PER_HOUR` (default 60) pushes per user and conversation. Failed sends do not count.
+- **Web Push:** off until the operator enables it for a client. Device endpoints must belong to a known push service (Google, Mozilla, Microsoft, Apple), so the Worker never posts to an arbitrary URL.
+- **No secrets in logs:** delivery records and logs never contain variables, tokens, reset URLs, SMTP credentials, push text or device endpoints.
 <!-- #endregion security -->
 
 ## Project structure
@@ -152,7 +155,8 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 ```text
 src/
 ├── index.ts       # Worker entry point and router
-├── admin/         # dashboard API: setup, login, sessions, stats, logs, SQL
+├── admin/         # dashboard API: setup, login, sessions, stats, logs, SQL, clients
+├── push/          # Web Push: VAPID and encryption, subscriptions, sender
 ├── routes/        # email, notifications, events, templates, health
 ├── security/      # auth, payload validation, rate limiting
 ├── services/      # email-service (idempotency, retries, delivery log), queue-consumer (async sends), logger (app_logs)
@@ -161,7 +165,7 @@ src/
 └── types/
 public/admin/      # dashboard pages, served as static assets
 migrations/        # D1 schema
-scripts/           # create-client.mjs
+scripts/           # create-client.mjs, vapid-keys.mjs
 test/              # vitest, runs inside workerd
 docs/              # docs site (VitePress): guides, API Reference; specs and plans are not published
 ```
@@ -193,4 +197,3 @@ These items come from the spec and are planned after the MVP:
 - HMAC request signing (`X-Client-Id`, `X-Timestamp`, `X-Signature`)
 - OAuth2 / XOAUTH2 for Google Workspace and Microsoft 365
 - Encrypted per-tenant SMTP credentials stored in a database
-- Web Push notifications

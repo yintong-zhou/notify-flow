@@ -41,6 +41,7 @@ Every call: `Authorization: Bearer {NOTIFY_FLOW_API_KEY}`. Errors are `{"error":
   - `submitted`: the SMTP server accepted it. That does not mean it reached the inbox: never call it "delivered";
   - `failed`, with `error_code`. `abandoned` means the send died midway.
 - `GET /health` → `{"status":"ok"}`. It needs no key.
+- Web Push is opt-in and not part of this page: the notify-flow operator enables it per app, and its routes (`/v1/push/public-key`, `PUT`/`DELETE /v1/push/subscriptions`, `POST /v1/push/send`) answer `503 push_not_configured` or `403 push_disabled` otherwise. They have their own limit of 600 requests per minute per key, so they never use up the budget below. This page does not use them.
 - Limits: 60 requests per minute per key, shared with the app's real sends. Every page action counts, so never poll in a loop. On `429 rate_limited`, wait at least 60 s. A send allows 5 emails per hour to the same recipient with the same template.
 
 notify-flow has NO endpoint for a list of sent emails, statistics, its SMTP configuration or key details. Never try to read them from it: the sections below build them from this app's own data.

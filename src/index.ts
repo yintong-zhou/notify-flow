@@ -1,12 +1,14 @@
 import { purgeSessions } from "./admin/auth";
 import { handleAdmin } from "./admin/routes";
+import { purgePushDeliveries } from "./push/sender";
+import { handlePush, type PushFetch } from "./push/routes";
 import { getEmail, sendEmail } from "./routes/email";
 import { deleteEvent, getEvent, listEvents, putEvent } from "./routes/events";
 import { sendNotification } from "./routes/notifications";
 import { health } from "./routes/health";
 import { deleteTemplate, getTemplate, listTemplates, putTemplate } from "./routes/templates";
 import { authenticate } from "./security/auth";
-import { checkClientLimit, checkIpLimit } from "./security/rate-limit";
+import { checkClientLimit, checkIpLimit, checkPushLimit } from "./security/rate-limit";
 import { purgeDeliveries, type QueuedEmail } from "./services/email-service";
 import { logRequestError, purgeLogs } from "./services/logger";
 import { handleQueue } from "./services/queue-consumer";
@@ -22,6 +24,7 @@ export async function handle(
   env: Env,
   send: SendMailFn = sendMail,
   ctx?: ExecutionContext,
+  fetchPush: PushFetch = fetch,
 ): Promise<Response> {
   let clientId: string | undefined;
   try {
@@ -35,7 +38,9 @@ export async function handle(
 
     await checkIpLimit(env, req);
     clientId = await authenticate(req, env);
-    await checkClientLimit(env, clientId);
+    const push = pathname.startsWith("/v1/push/");
+    await (push ? checkPushLimit : checkClientLimit)(env, clientId);
+    if (push) return await handlePush(req, env, clientId, pathname.slice("/v1/push/".length), fetchPush, ctx);
 
     if (pathname === "/v1/email/send") {
       allow(req, "POST");
@@ -97,6 +102,6 @@ async function errorResponse(req: Request, env: Env, e: unknown, clientId?: stri
 
 export default {
   fetch: (req, env, ctx) => handle(req, env, sendMail, ctx),
-  scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.all([purgeDeliveries(env.DB), purgeSessions(env.DB), purgeLogs(env.DB)])),
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.all([purgeDeliveries(env.DB), purgePushDeliveries(env.DB), purgeSessions(env.DB), purgeLogs(env.DB)])),
   queue: (batch, env) => handleQueue(batch, env, sendMail),
 } satisfies ExportedHandler<Env, QueuedEmail>;

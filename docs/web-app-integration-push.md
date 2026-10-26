@@ -1,6 +1,6 @@
 # Integrating notify-flow — Web Push
 
-Part of the [web app integration guide](web-app-integration.md). Contract: [Web Push API reference](api-reference-push.md).
+Part of the [web app integration guide](web-app-integration.md). Contract: [Web Push API reference](api-reference-push.md). To let a coding agent do it, paste the [AI Web Push prompt](ai-push-integration-prompt.md).
 
 ## When to use it
 

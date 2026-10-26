@@ -15,7 +15,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: "Home", link: "/" },
-      { text: "Documentation", link: "/getting-started", activeMatch: "^/(getting-started|web-app-integration|ai-integration|ai-management)" },
+      { text: "Documentation", link: "/getting-started", activeMatch: "^/(getting-started|web-app-integration|ai-integration|ai-push|ai-management)" },
       { text: "API Reference", link: "/api-reference", activeMatch: "^/api-reference" },
     ],
     sidebar: [
@@ -34,6 +34,7 @@ export default defineConfig({
             ],
           },
           { text: "AI integration prompt", link: "/ai-integration-prompt" },
+          { text: "AI Web Push prompt", link: "/ai-push-integration-prompt" },
           { text: "AI management page prompt", link: "/ai-management-page-prompt" },
           { text: "Admin dashboard", link: "/admin-dashboard" },
         ],

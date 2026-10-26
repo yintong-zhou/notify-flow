@@ -21,7 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Requirements: `notification-service.md` (continues in `docs/requirements/`)
 - Design spec: `docs/superpowers/specs/2026-10-08-notification-service-mvp-design.md` (+ `-part2.md`)
 - Web app integration guide: `docs/web-app-integration.md` (+ `-flows.md`, `-async.md`, `-events.md`, `-push.md`); push API contract: `docs/api-reference-push.md`
-- Site: `docs/index.md`, `docs/getting-started.md` (include README regions `<!-- #region … -->`: keep relative links out of them); API contract: `docs/api-reference*.md` (`docs/ai-integration-prompt.md` and `docs/ai-management-page-prompt.md` keep copies, update all)
+- Site: `docs/index.md`, `docs/getting-started.md` (include README regions `<!-- #region … -->`: keep relative links out of them); API contract: `docs/api-reference*.md` (`docs/ai-integration-prompt.md`, `docs/ai-push-integration-prompt.md` and `docs/ai-management-page-prompt.md` keep copies, update all)
 
 Keep every Markdown file under 200 lines: split a longer one into linked parts, or tighten it.
 

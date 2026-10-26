@@ -6,7 +6,7 @@ A self-hosted transactional email service for Cloudflare Workers. Your backends 
 > The MVP is implemented: emails are sent by template name or by event, synchronously or asynchronously through Cloudflare Queues, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
 
 > [!TIP]
-> Adding email to your web app? Follow the **[web app integration guide](docs/web-app-integration.md)**: a step-by-step walkthrough with backend code samples. Or paste the **[AI integration prompt](docs/ai-integration-prompt.md)** into a coding agent and let it do the work, then the **[AI management page prompt](docs/ai-management-page-prompt.md)** to get an admin page with statistics and template editing.
+> Adding email to your web app? Follow the **[web app integration guide](docs/web-app-integration.md)**: a step-by-step walkthrough with backend code samples. Or paste the **[AI integration prompt](docs/ai-integration-prompt.md)** into a coding agent and let it do the work, then the **[AI management page prompt](docs/ai-management-page-prompt.md)** to get an admin page with statistics and template editing. For push notifications only, without email, use the **[AI Web Push prompt](docs/ai-push-integration-prompt.md)**.
 
 ## Why
 

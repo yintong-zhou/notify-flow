@@ -1,4 +1,4 @@
-import { parseIdempotencyKey, parseSendRequest, readJson, type SendRequest } from "../security/validation";
+import { enabledLocales, parseIdempotencyKey, parseSendRequest, readJson, type SendRequest } from "../security/validation";
 import { enqueueTemplatedEmail, findDelivery, sendTemplatedEmail } from "../services/email-service";
 import type { SendMailFn } from "../smtp/smtp-client";
 import { HttpError } from "../types";
@@ -32,7 +32,7 @@ export async function dispatch(
 
 export async function sendEmail(req: Request, env: Env, clientId: string, send: SendMailFn, ctx?: ExecutionContext): Promise<Response> {
   const idempotencyKey = parseIdempotencyKey(req);
-  return dispatch(req, env, clientId, parseSendRequest(await readJson(req)), idempotencyKey, send, ctx);
+  return dispatch(req, env, clientId, parseSendRequest(await readJson(req), enabledLocales(env)), idempotencyKey, send, ctx);
 }
 
 export async function getEmail(env: Env, clientId: string, id: string): Promise<Response> {

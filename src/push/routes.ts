@@ -1,4 +1,4 @@
-import { parseIdempotencyKey, readJson } from "../security/validation";
+import { enabledLocales, parseIdempotencyKey, readJson } from "../security/validation";
 import { HttpError } from "../types";
 import { pushConfigured, vapidKeys } from "./crypto";
 import { sendPush } from "./sender";
@@ -35,7 +35,7 @@ const deleteSubscriptions: Handler = async (req, env, clientId) => {
 
 const send: Handler = async (req, env, clientId, fetchPush, ctx) => {
   const idempotencyKey = parseIdempotencyKey(req); // before the body, so a bad key is rejected without reading it
-  const request = parsePushRequest(await readJson(req));
+  const request = parsePushRequest(await readJson(req), enabledLocales(env));
   const requestId = req.headers.get("cf-ray") ?? crypto.randomUUID();
   const result = sendPush(env, clientId, request, { idempotencyKey, requestId }, fetchPush);
   // Keep the send (and its status UPDATE) running if the caller disconnects before it finishes.

@@ -21,10 +21,10 @@ describe("authentication", () => {
 });
 
 describe("template CRUD", () => {
-  it("lists the 18 built-ins for a new client", async () => {
+  it("lists the 24 built-ins for a new client", async () => {
     const { key } = await createClient();
     const list = await (await call("/v1/templates", { key })).json<any[]>();
-    expect(list).toHaveLength(18);
+    expect(list).toHaveLength(24);
     expect(list.every((t) => t.builtin === true && t.updated_at === null)).toBe(true);
   });
 
@@ -46,7 +46,7 @@ describe("template CRUD", () => {
     const welcomeIt = list.filter((t) => t.name === "welcome" && t.locale === "it");
     expect(welcomeIt).toHaveLength(1);
     expect(welcomeIt[0].builtin).toBe(false);
-    expect(list).toHaveLength(18);
+    expect(list).toHaveLength(24);
   });
 
   it("updates an existing template", async () => {

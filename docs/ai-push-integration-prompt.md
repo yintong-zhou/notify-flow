@@ -31,10 +31,10 @@ Every call sends `Authorization: Bearer {NOTIFY_FLOW_API_KEY}` and a JSON body w
 - `PUT /v1/push/subscriptions` with `{"user_id":"…","subscription":{…}}`, where `subscription` is the browser's `PushSubscription.toJSON()` → `204`. `user_id` is 1-128 characters with no control characters. It is an upsert per endpoint: repeating it is harmless, and it moves a shared device to the user now signed in. Only the 10 newest devices per user are kept. `400 unsupported_push_service` when the endpoint is not on the Google, Mozilla, Microsoft or Apple push service.
 - `DELETE /v1/push/subscriptions` with exactly one of `{"endpoint":"…"}` (one device, on logout) or `{"user_id":"…"}` (all devices, on account deletion) → `204`, even when nothing matched. It is scoped to this app, not to a user.
 - `POST /v1/push/send` with an `Idempotency-Key` header (1-255 characters, unique per event) and the body `{"user_id":"…","template":"new-message","locale":"it","variables":{"appName":"…","sender":"…"},"url":"/chat/42","tag":"chat-42"}`:
-  - `locale`: `it`, `en` or `pt-BR`, default `en`. `variables`: exactly `appName` and `sender`, each 1-64 characters with no control characters.
+  - `locale`: `it`, `en`, `pt-BR` or `zh-CN` (only those in the deployment's `LOCALES` var, when set), default `en`. `variables`: exactly `appName` and `sender`, each 1-64 characters with no control characters.
   - `url` (optional): a path on my own site, 1-512 characters, starting with a single `/`, with no `\`.
   - `tag` (optional): `^[A-Za-z0-9_-]{1,32}$`, the conversation id. Notifications with the same tag replace each other on screen. A UUID fits once its dashes are removed.
-  - The device receives `{"title","body","url","tag"}`: the title is `{{appName}}`, the body "You received a notification from {{sender}}" (also in `it` and `pt-BR`).
+  - The device receives `{"title","body","url","tag"}`: the title is `{{appName}}`, the body "You received a notification from {{sender}}" (also in `it`, `pt-BR` and `zh-CN`).
 
 | Outcome of `/v1/push/send` | What to do |
 |---|---|
@@ -90,7 +90,7 @@ List the files you will create or change, the backend routes, and which event tr
 6. iPhone and iPad: push works only once the app is added to the Home Screen. If there is no web app manifest, create a minimal one (`name`, `icons`, `start_url`, `display: "standalone"`), and next to the button tell iOS users to add the app first.
 7. Wire the events, for example a new chat message. If the recipient has that conversation open and focused on any device, deliver through the realtime channel only. Otherwise call `sendPush` with `tag` = the conversation id, `url` = the conversation's path, `sender` = the sender's display name without control characters and cut to 64 characters, and `Idempotency-Key` = `msg:<messageId>`. Without a realtime channel, push every message and rely on step 8. A failed push only logs the `id` and the code.
 8. When a conversation opens, or shows a new message while focused, close its notifications: `registration.getNotifications({ tag })`, then `close()` on each.
-9. Map the user's language to `it`/`en`/`pt-BR`, falling back to `en`.
+9. Map the user's language to `it`/`en`/`pt-BR`/`zh-CN`, falling back to `en`.
 10. If there is old push code, replace it. Ask me before removing dependencies and keys that are no longer needed.
 
 ### 5. Verification

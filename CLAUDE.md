@@ -29,7 +29,7 @@ Keep every Markdown file under 200 lines: split a longer one into linked parts, 
 
 ## What this is
 
-A transactional email service running on Cloudflare Workers (TypeScript). It is meant to be shared by several applications, which call it over REST. It talks SMTP directly and does not use Resend, SendGrid, Mailgun or similar services. Callers are other backends, never frontends. It has no runtime dependencies.
+A transactional email service running on Cloudflare Workers (TypeScript). It is meant to be shared by several applications, which call it over REST. It talks SMTP directly and does not use Resend, SendGrid, Mailgun or similar services. Callers are other backends, never frontends. It has no runtime dependencies. It is self-hosted with no shared public instance: each person or team deploys their own copy in their own Cloudflare account, so docs and AI prompts must never point at the author's deployment.
 
 ## Architecture
 

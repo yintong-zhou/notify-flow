@@ -2,6 +2,9 @@
 
 A self-hosted transactional email service for Cloudflare Workers. Your backends call one authenticated REST API, and notify-flow renders the email from a template and sends it over plain SMTP to Gmail, Microsoft 365 or any other SMTP server. It does not depend on Resend, SendGrid, Mailgun or similar platforms. It can also send Web Push notifications to your users' phones and computers, opt-in per client.
 
+> [!IMPORTANT]
+> **There is no shared public instance.** Each person or team deploys their own notify-flow, in their own Cloudflare account, with their own D1 database, queue and SMTP mailbox, and connects their own apps to it. The author's deployment is private and is not offered as a service: don't point your apps at it. The [AI integration prompt](docs/ai-integration-prompt.md) walks you through your own deploy and the integration into your site.
+
 > [!NOTE]
 > The MVP is implemented: emails are sent by template name or by event, synchronously or asynchronously through Cloudflare Queues, and data lives in Cloudflare D1. The [Roadmap](#roadmap) lists what comes next.
 
@@ -39,7 +42,7 @@ notify-flow only delivers mail. Security logic such as generating reset tokens s
 ## Getting started
 
 <!-- #region getting-started -->
-You need Node.js 20+ and a Cloudflare account.
+You need Node.js 20+ and your own Cloudflare account ([sign up](https://dash.cloudflare.com/sign-up)): every deployment is independent, so the commands below create the Worker, database and queue in your account.
 
 ```bash
 npm install
@@ -62,9 +65,6 @@ npm run deploy
 npm run client:create -- my-app --remote
 ```
 
-> [!NOTE]
-> Gmail needs an [app password](https://support.google.com/accounts/answer/185833) when 2-step verification is on.
-
 For development:
 
 ```bash
@@ -75,9 +75,9 @@ npm run typecheck                        # regenerates worker types, then tsc
 
 ## Integrate it into your web app
 
-A web app sends email in three steps:
+A web app sends email through **your own deployment** (see [Getting started](#getting-started)) in three steps:
 
-1. **Get an API key.** Run `npm run client:create -- <app-name> --remote` once per app, then store the key as a secret in the app's backend.
+1. **Get an API key.** In your notify-flow folder, run `npm run client:create -- <app-name> --remote` once per app, then store the key and your Worker's URL as secrets in the app's backend.
 2. **Call the API from the backend.** Send `POST /v1/email/send` with a template, a recipient and the template's variables, or `POST /v1/notifications` with an event instead of a template. The frontend never calls notify-flow.
 3. **Handle the result.** Retry network errors, `429` and `500` with the same `Idempotency-Key`. Treat `4xx` as integration bugs.
 
@@ -132,7 +132,7 @@ Credentials are stored as [Cloudflare Secrets](https://developers.cloudflare.com
 
 | Preset | Host | Port, security and auth |
 |---|---|---|
-| `gmail` | `smtp.gmail.com` | `465` with TLS, AUTH PLAIN |
+| `gmail` | `smtp.gmail.com` | `465` with TLS, AUTH PLAIN; needs an [app password](https://support.google.com/accounts/answer/185833) |
 | `microsoft` | `smtp.office365.com` | `587` with STARTTLS, AUTH LOGIN |
 | `generic` | set `SMTP_HOST` | `587` with STARTTLS, AUTH PLAIN |
 

@@ -4,7 +4,7 @@ Part of the [web app integration guide](web-app-integration.md). Contract: [Web 
 
 ## When to use it
 
-Push shows a notification on a user's phone or computer even when your app is closed, for example "You received a notification from Marco". It is opt-in: ask the notify-flow administrator to enable it for your client ([setup](admin-dashboard.md#web-push)).
+Push shows a notification on a user's phone or computer even when your app is closed, for example "You received a notification from Marco". It is opt-in: enable it for your client on your own notify-flow deployment ([setup](admin-dashboard.md#web-push)).
 
 A notification never carries user-written text. notify-flow renders a built-in template from a few short variables (the sender's name, the app name), so the user taps it and reads the message in your app.
 

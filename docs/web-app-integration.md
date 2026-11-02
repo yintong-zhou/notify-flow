@@ -18,11 +18,13 @@ notify-flow only delivers email: it doesn't know your users and doesn't handle p
 
 ## Prerequisites
 
-The notify-flow administrator gives each web app a URL and its own API key. Both go in the web app's backend, never in the frontend.
+notify-flow is self-hosted: there is no shared instance. You first deploy your own copy in your own Cloudflare account ([Getting started](getting-started.md)), and your web apps talk only to that deployment, never to someone else's (the author's included). In this guide, "the administrator" is whoever runs your deployment: usually you.
+
+Your deployment gives each web app a URL and its own API key. Both go in the web app's backend, never in the frontend.
 
 | What | Value | Where it goes |
 | --- | --- | --- |
-| Service URL | `https://notify-flow.<your-subdomain>.workers.dev` | Backend environment variable, e.g. `NOTIFY_FLOW_URL` |
+| Service URL | Your Worker's URL, `https://notify-flow.<your-subdomain>.workers.dev` | Backend environment variable, e.g. `NOTIFY_FLOW_URL` |
 | API key | `nf_…`, shown once when it is created | Backend secret, e.g. `NOTIFY_FLOW_API_KEY` |
 | App name | Free text, e.g. `Acme` | Sent with every email as the `appName` variable |
 

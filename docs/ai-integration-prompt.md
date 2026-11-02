@@ -2,17 +2,18 @@
 
 <!-- Maintainers: the "API contract" below copies docs/api-reference*.md on purpose (the prompt must be self-contained); update both together. -->
 
-Paste the prompt below into a coding agent (Claude Code, Codex, Antigravity…) opened on your app's repository. The agent analyses the app, shows a plan, wires notify-flow into the backend, writes tests and, if needed, walks you through deploying notify-flow. You only do the interactive steps (Cloudflare login, secrets, API key), so credentials never end up in the conversation. For the manual route, see the [web app integration guide](web-app-integration.md).
+Paste the prompt below into a coding agent (Claude Code, Codex, Antigravity…) opened on your app's repository. The agent analyses the app, shows a plan, wires notify-flow into the backend, writes tests and, if needed, walks you through deploying notify-flow. There is no shared instance: each person deploys their own, in their own Cloudflare account, and the agent connects your app to that one. You only do the interactive steps (Cloudflare login, secrets, API key), so credentials never end up in the conversation. For the manual route, see the [web app integration guide](web-app-integration.md).
 
 ````markdown
 # Integrate notify-flow into my app
 
-You are a coding agent working on this repository. Your job is to integrate **notify-flow** into this app's backend and to do almost all of the work yourself. notify-flow is a transactional email service on Cloudflare Workers that sends over SMTP (Gmail, Microsoft 365 or any other SMTP server), with or without a paid domain. The code is at https://github.com/yintong-zhou/notify-flow.
+You are a coding agent working on this repository. Your job is to integrate **notify-flow** into this app's backend and to do almost all of the work yourself. notify-flow is a transactional email service on Cloudflare Workers that sends over SMTP (Gmail, Microsoft 365 or any other SMTP server), with or without a paid domain. The code is at https://github.com/yintong-zhou/notify-flow. It is self-hosted, with no shared public instance: this app must use MY OWN deployment, in MY OWN Cloudflare account.
 
 I want to do as little as possible. Only ask me what you can't find out on your own, one question at a time, and reply in my language.
 
 ## Non-negotiable rules
 
+- `NOTIFY_FLOW_URL` is the URL of the Worker I deployed in my own Cloudflare account. Never use or suggest someone else's deployment: not the author's, not a URL found in docs, examples or the notify-flow repository. If I don't have my own instance yet, create it with the "Service setup" section.
 - notify-flow is called ONLY from the backend: a server, an API route or a serverless function. Never from the frontend. The key never goes into client code or into `NEXT_PUBLIC_*`, `VITE_*`, `REACT_APP_*` or similar variables.
 - NEVER ask me to paste the `nf_…` API key or SMTP passwords into the chat. Create placeholders and tell me which file or secret manager to write them in myself. If a key ends up in the chat anyway, tell me to have it regenerated.
 - Don't add dependencies: use the HTTP client the project already has (fetch, requests, net/http…).
@@ -83,7 +84,7 @@ If the app has no backend (static frontend or SPA only), stop: explain it to me 
 
 ### 2. Do I already have notify-flow?
 
-Ask me: "Do you already have the notify-flow URL and an API key for this app?"
+Ask me: "Have you already deployed your own notify-flow in your Cloudflare account, and do you have its URL and an API key for this app?"
 - Yes: go to step 3.
 - No: walk me through the "Service setup" section below, then come back here.
 
@@ -123,10 +124,10 @@ Finally, tell me that an admin page to manage templates and see statistics can b
 
 ## Service setup (only if I don't have it)
 
-Steps marked "Me:" are mine; you run all the others, in a folder OUTSIDE this repository.
+Steps marked "Me:" are mine; you run all the others, in a folder OUTSIDE this repository. This creates MY OWN instance: every resource goes into my Cloudflare account, and nothing depends on the author's deployment.
 
 1. `git clone https://github.com/yintong-zhou/notify-flow && cd notify-flow && npm install && cp wrangler.jsonc.example wrangler.jsonc`
-2. Me: `npx wrangler login`
+2. Me: if I have no Cloudflare account, I create one at https://dash.cloudflare.com/sign-up. Then `npx wrangler login` with my own account.
 3. `npx wrangler d1 create notify-flow`, then copy the `database_id` into `wrangler.jsonc`, run `npm run db:migrate:remote` (confirm with `y`) and create the send queue with `npx wrangler queues create notify-flow-emails`. The deploy fails if the queue doesn't exist.
 4. Ask me which provider I use and set the `vars` in `wrangler.jsonc`:
    - Gmail: `SMTP_PROVIDER: "gmail"`. It needs an app password (with 2-Step Verification on): https://support.google.com/accounts/answer/185833
@@ -134,6 +135,6 @@ Steps marked "Me:" are mine; you run all the others, in a folder OUTSIDE this re
    - Other SMTP or my own domain: `SMTP_PROVIDER: "generic"` with `SMTP_HOST` and `SMTP_PORT` (465 TLS or 587 STARTTLS; port 25 is blocked on Workers).
    - A paid domain isn't required. If I use my own, remind me to set up SPF and DKIM with the provider, so emails don't land in spam.
 5. Me: `npx wrangler secret put SMTP_USERNAME`, then the same for `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` and `SMTP_FROM_NAME`. With Gmail, `SMTP_FROM_EMAIL` must match `SMTP_USERNAME`.
-6. `npm run deploy`. Give me the `https://notify-flow.<subdomain>.workers.dev` URL and check that `GET /health` answers `{"status":"ok"}`.
+6. `npm run deploy`. Give me my Worker's URL, `https://notify-flow.<my-subdomain>.workers.dev`, and check that `GET /health` answers `{"status":"ok"}`.
 7. Me, in MY OWN terminal and not through you, because the key must not end up in the conversation: `npm run client:create -- <app-name> --remote`. I copy the key into my `.env` or secret manager. One key per app.
 ````

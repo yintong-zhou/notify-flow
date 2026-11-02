@@ -7,7 +7,7 @@ Already sending through notify-flow? Paste the prompt below into a coding agent 
 ````markdown
 # Add a notify-flow management page to my app
 
-You are a coding agent working on this repository. This app already sends email through **notify-flow** (https://github.com/yintong-zhou/notify-flow), a transactional email service on Cloudflare Workers. Your job is to add an admin page, inside this app, from which I can see and manage everything about notify-flow, as user friendly as possible. Do almost all of the work yourself.
+You are a coding agent working on this repository. This app already sends email through **notify-flow** (https://github.com/yintong-zhou/notify-flow), a self-hosted transactional email service on Cloudflare Workers. There is no shared instance: the app uses OUR OWN deployment, in our own Cloudflare account, and never someone else's (not the author's either). Your job is to add an admin page, inside this app, from which I can see and manage everything about notify-flow, as user friendly as possible. Do almost all of the work yourself.
 
 I want to do as little as possible. Only ask me what you can't find out on your own, one question at a time, and reply in my language.
 
@@ -62,7 +62,7 @@ Ask only what the analysis did not settle, one at a time:
 1. What to group the statistics by. Propose the entity you found.
 2. Who may open the page: which role or login.
 3. Which sections to include. By default all of those below; event mappings are optional.
-4. Whether I run the notify-flow instance myself (I deployed it with wrangler) or someone else runs it for me.
+4. Whether I deployed our notify-flow instance myself with wrangler, or a teammate runs it in our Cloudflare account.
 
 ### 3. Plan
 
@@ -116,8 +116,8 @@ Use the app's existing layout, components and language. Give every section an em
     - `SMTP_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_AUTH_TYPE` and `RECIPIENT_LIMIT_PER_HOUR` are `vars` in notify-flow's `wrangler.jsonc`, followed by `npm run deploy`;
     - `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` and `SMTP_FROM_NAME` are changed with `npx wrangler secret put <NAME>`;
     - all of them are also in the Cloudflare dashboard, under Workers & Pages → notify-flow → Settings → Variables and Secrets.
-  - Otherwise: "ask the notify-flow operator". This app's own `NOTIFY_FLOW_*` variables are shown as set or missing, never their values.
-- **API key**, read-only: the masked prefix and the last use. Explain that only the notify-flow operator can issue a new key, and that this app's env var and a redeploy are then needed.
+  - Otherwise: "ask the teammate who runs our notify-flow deployment". This app's own `NOTIFY_FLOW_*` variables are shown as set or missing, never their values.
+- **API key**, read-only: the masked prefix and the last use. Explain that a new key is issued from our notify-flow deployment (`npm run client:create -- <app-name> --remote`, by me or the teammate who runs it), and that this app's env var and a redeploy are then needed.
 
 ### 7. Verification
 

@@ -16,7 +16,7 @@ Un servizio centralizzato su Cloudflare Workers per inviare email transazionali 
 ## A che punto siamo
 
 - **MVP completo:** è su `main` ed è pushato (`99b19e9`). Ci sono 67 test che passano (`npm test`) e il typecheck è pulito.
-- **In produzione:** `https://notify-flow.jjservice.workers.dev`, con Gmail personale come provider.
+- **In produzione:** `https://notify-flow.example-subdomain.workers.dev`, con Gmail personale come provider.
   - Un invio reale fatto oggi è risultato `submitted`.
   - I secret SMTP sono impostati.
   - Le migrazioni D1 `0001` e `0002` sono applicate e registrate in `d1_migrations`.
@@ -36,7 +36,7 @@ Un servizio centralizzato su Cloudflare Workers per inviare email transazionali 
 - **`tsc` fallisce su `SocketOptions`:** in workers-types 5.x il campo `allowHalfOpen` è obbligatorio. Si passa `allowHalfOpen: false`, che è il valore predefinito.
 - **`tsc` fallisce su `clearTimeout`:** accetta `number | null`, quindi il timer si inizializza a `null`.
 - **`wrangler dev` resta vivo dopo lo stop:** su Windows `workerd` rimane in ascolto sulla 8787. Si chiude con `taskkill //PID <pid-wrangler> //T //F`.
-- **Hostname non risolto dopo il cambio di sottodominio workers.dev** (`zhouyintong96` è diventato `jjservice`): DNS e certificato TLS impiegano qualche minuto. Basta aspettare.
+- **Hostname non risolto dopo il cambio di sottodominio workers.dev** (`old-subdomain` è diventato `example-subdomain`): DNS e certificato TLS impiegano qualche minuto. Basta aspettare.
 - **Microsoft 365:** non offre `AUTH PLAIN`. Il preset `microsoft` usa `login`.
 
 ## Decisioni prese

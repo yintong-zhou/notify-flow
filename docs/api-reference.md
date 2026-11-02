@@ -4,7 +4,7 @@ The full contract of the notify-flow REST API. For a guided walkthrough with cod
 
 ## Base URL
 
-The URL of your deployed Worker, for example `https://notify-flow.<account>.workers.dev`. Every API route lives under `/v1/`; `/health` is the only route outside it.
+The URL of the Worker you deployed in your own Cloudflare account, for example `https://notify-flow.<account>.workers.dev`. There is no shared public instance: each person or team runs their own ([Getting started](getting-started.md)). Every API route lives under `/v1/`; `/health` is the only route outside it.
 
 ## Authentication
 

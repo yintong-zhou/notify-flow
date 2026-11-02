@@ -2,17 +2,18 @@
 
 <!-- Maintainers: the "API contract" below copies docs/api-reference-push.md on purpose (the prompt must be self-contained); update both together. -->
 
-Paste the prompt below into a coding agent (Claude Code, Codex, Antigravity…) opened on your app's repository. It wires **only Web Push**, from the browser subscription to the service worker and the backend calls, and leaves email out entirely: for email, use the [AI integration prompt](ai-integration-prompt.md). You only do the interactive steps (Cloudflare login, secrets, API key, VAPID private key), so credentials never end up in the conversation. For the manual route, see the [Web Push guide](web-app-integration-push.md).
+Paste the prompt below into a coding agent (Claude Code, Codex, Antigravity…) opened on your app's repository. It wires **only Web Push**, from the browser subscription to the service worker and the backend calls, and leaves email out entirely: for email, use the [AI integration prompt](ai-integration-prompt.md). There is no shared instance: each person deploys their own notify-flow, in their own Cloudflare account, and the agent connects your app to that one. You only do the interactive steps (Cloudflare login, secrets, API key, VAPID private key), so credentials never end up in the conversation. For the manual route, see the [Web Push guide](web-app-integration-push.md).
 
 ````markdown
 # Integrate notify-flow Web Push into my app
 
-You are a coding agent working on this repository. Your job is to add **Web Push notifications** to this app through **notify-flow**, and to do almost all of the work yourself. notify-flow is a service on Cloudflare Workers that also sends email, but here I want push only: do not integrate `/v1/email/*`, `/v1/notifications` or `/v1/templates`, and do not touch any email code. The code is at https://github.com/yintong-zhou/notify-flow, and the reference for the browser code is https://github.com/yintong-zhou/notify-flow/blob/main/docs/web-app-integration-push.md.
+You are a coding agent working on this repository. Your job is to add **Web Push notifications** to this app through **notify-flow**, and to do almost all of the work yourself. notify-flow is a service on Cloudflare Workers that also sends email, but here I want push only: do not integrate `/v1/email/*`, `/v1/notifications` or `/v1/templates`, and do not touch any email code. The code is at https://github.com/yintong-zhou/notify-flow, and the reference for the browser code is https://github.com/yintong-zhou/notify-flow/blob/main/docs/web-app-integration-push.md. It is self-hosted, with no shared public instance: this app must use MY OWN deployment, in MY OWN Cloudflare account.
 
 I want to do as little as possible. Only ask me what you can't find out on your own, one question at a time, and reply in my language.
 
 ## Non-negotiable rules
 
+- `NOTIFY_FLOW_URL` is the URL of the Worker I deployed in my own Cloudflare account. Never use or suggest someone else's deployment: not the author's, not a URL found in docs, examples or the notify-flow repository. If I don't have my own instance yet, create it with the "Service setup" section.
 - notify-flow is called ONLY from the backend: a server, an API route or a serverless function. The browser talks to my backend's own routes. The key never goes into client code or into `NEXT_PUBLIC_*`, `VITE_*`, `REACT_APP_*` or similar variables.
 - NEVER ask me to paste the `nf_…` API key or the VAPID private key into the chat. Create placeholders and tell me where to write them myself. If one ends up in the chat anyway, tell me to regenerate it.
 - Don't add dependencies: no `web-push` or similar library, because notify-flow encrypts and signs. Use the HTTP client the project already has.
@@ -64,7 +65,7 @@ If the app has no backend (static frontend or SPA only), stop: explain it to me 
 
 ### 2. Do I already have notify-flow with push?
 
-Ask me: "Do you already have the notify-flow URL and an API key for this app, with Web Push enabled?" If I'm not sure, ask me to run `curl {URL}/v1/push/public-key -H "Authorization: Bearer <key>"` in my own terminal and tell you the status: `200` is ready, `503` means the VAPID keys are missing, `403` means push is off for this app.
+Ask me: "Have you already deployed your own notify-flow in your Cloudflare account, and do you have its URL and an API key for this app, with Web Push enabled?" If I'm not sure, ask me to run `curl {URL}/v1/push/public-key -H "Authorization: Bearer <key>"` in my own terminal and tell you the status: `200` is ready, `503` means the VAPID keys are missing, `403` means push is off for this app.
 - Ready: go to step 3.
 - Otherwise: walk me through the "Service setup" section below, then come back here.
 
@@ -111,15 +112,15 @@ Finally, tell me that transactional email (sign-up, password reset…) can be ad
 
 ## Service setup (only if I don't have it)
 
-Steps marked "Me:" are mine; you run all the others, in a folder OUTSIDE this repository. If notify-flow is already deployed (for example for email), work in its folder and start from step 5.
+Steps marked "Me:" are mine; you run all the others, in a folder OUTSIDE this repository. This creates MY OWN instance: every resource goes into my Cloudflare account, and nothing depends on the author's deployment. If I already deployed my own notify-flow (for example for email), work in its folder and start from step 5.
 
 1. `git clone https://github.com/yintong-zhou/notify-flow && cd notify-flow && npm install && cp wrangler.jsonc.example wrangler.jsonc`
-2. Me: `npx wrangler login`
+2. Me: if I have no Cloudflare account, I create one at https://dash.cloudflare.com/sign-up. Then `npx wrangler login` with my own account.
 3. `npx wrangler d1 create notify-flow`, then copy the `database_id` into `wrangler.jsonc`. Create the queue with `npx wrangler queues create notify-flow-emails`: the deploy fails without it, even when email is unused.
 4. Me: `npx wrangler secret put ADMIN_SETUP_TOKEN` with a long random string. notify-flow also lists `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` and `SMTP_FROM_NAME` as required secrets: since I don't use email, I set each one to `unused`. Email sends would fail, and push is unaffected.
 5. Me, in MY OWN terminal: `npm run push:keys`. It prints a public and a private key. I store the private key with `npx wrangler secret put VAPID_PRIVATE_KEY`, keep a copy in a password manager, and give you the PUBLIC key only.
 6. In `wrangler.jsonc`, set the vars `VAPID_PUBLIC_KEY` (the public key) and `VAPID_SUBJECT` (ask me for a `mailto:` address). Remind me never to rotate these keys: every browser would have to subscribe again.
-7. `npm run db:migrate:remote` (confirm with `y`), then `npm run deploy`. Give me the `https://notify-flow.<subdomain>.workers.dev` URL and check that `GET /health` answers `{"status":"ok"}`.
+7. `npm run db:migrate:remote` (confirm with `y`), then `npm run deploy`. Give me my Worker's URL, `https://notify-flow.<my-subdomain>.workers.dev`, and check that `GET /health` answers `{"status":"ok"}`.
 8. Me, in MY OWN terminal, unless this app already has a key: `npm run client:create -- <app-name> --remote`. I copy the key into my `.env` or secret manager.
 9. Switch push on for the app: `npx wrangler d1 execute notify-flow --remote --command "UPDATE clients SET push_enabled = 1 WHERE name = '<app-name>'"`, or the **Clients** panel of `/admin/`. Then ask me to run the `curl` from step 2: `200` means push is ready.
 ````

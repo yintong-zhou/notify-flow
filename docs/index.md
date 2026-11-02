@@ -17,6 +17,10 @@ hero:
 
 <!--@include: ../README.md#how-it-works-->
 
+## Your own instance
+
+notify-flow is not a hosted service: there is no shared instance to sign up for. Each person or team deploys their own copy in their own Cloudflare account, with their own SMTP mailbox, and calls it from their own backends. [Getting started](/getting-started) covers the deploy, and the [AI integration prompt](/ai-integration-prompt) lets a coding agent do it with you. In the examples below, `NOTIFY_FLOW_URL` is the URL of your Worker.
+
 ## Send your first email
 
 ```bash

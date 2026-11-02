@@ -18,7 +18,7 @@ Every app ends up sending the same emails: welcome, email verification, password
 
 - **One integration.** Apps call a REST endpoint instead of each embedding its own SMTP logic and credentials.
 - **Templates, not raw HTML.** Callers pick a template and pass variables. They can't send an arbitrary subject or body, which closes off spam and impersonation.
-- **Your own templates.** Each client can register its own templates, or override the built-in ones, in `it`, `en` and `pt-BR`.
+- **Your own templates.** Each client can register its own templates, or override the built-in ones, in `it`, `en`, `pt-BR` and `zh-CN` (the `LOCALES` var narrows the list per deployment).
 - **Any SMTP provider.** Gmail and Microsoft 365 are configuration presets on top of a generic SMTP client, not hard dependencies.
 <!-- #endregion why -->
 

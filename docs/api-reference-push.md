@@ -85,7 +85,7 @@ curl -X POST "$NOTIFY_FLOW_URL/v1/push/send" \
 |---|---|---|
 | `user_id` | yes | As above |
 | `template` | yes | `^[a-z0-9-]{1,64}$`, a [built-in push template](#built-in-push-template). Otherwise `404 template_not_found` |
-| `locale` | no | `it`, `en` or `pt-BR`. Default `en`, and a missing locale falls back to `en` |
+| `locale` | no | `it`, `en`, `pt-BR` or `zh-CN`, limited to [`LOCALES`](api-reference.md#locales) when set. Default `en`, and a missing locale falls back to `en` |
 | `variables` | yes | An object whose keys are exactly the template's variables (otherwise `400 invalid_variables`). Each value is a string of 1-64 characters with no control characters |
 | `url` | no | A path on your own site: 1-512 characters, starts with `/` but not `//`, no `\`, no control characters. The service worker opens it on its own origin, so a link to another site is impossible |
 | `tag` | no | `^[A-Za-z0-9_-]{1,32}$`, for example the conversation id. Notifications with the same tag replace each other on screen, and while a phone is offline only the latest one survives |
@@ -119,4 +119,4 @@ Push templates are separate from email templates: `/v1/templates` does not list 
 |---|---|---|---|
 | `new-message` | `appName`, `sender` | `{{appName}}` | `You received a notification from {{sender}}` |
 
-The body is also available in `it` (`Hai ricevuto una notifica da {{sender}}`) and `pt-BR` (`Você recebeu uma notificação de {{sender}}`). The text is plain, with no HTML escaping.
+The body is also available in `it` (`Hai ricevuto una notifica da {{sender}}`), `pt-BR` (`Você recebeu uma notificação de {{sender}}`) and `zh-CN` (`您收到了来自 {{sender}} 的通知`). The text is plain, with no HTML escaping.

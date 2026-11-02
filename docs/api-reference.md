@@ -46,6 +46,10 @@ So a wrong method without a key answers `401`, not `405`. Paths outside `/v1/` o
 | Not valid JSON | `400 invalid_json` |
 | Valid JSON but not an object | `400 validation_error` |
 
+## Locales
+
+Supported locales: `it`, `en`, `pt-BR` and `zh-CN`. A deployment can accept fewer with the `LOCALES` var in `wrangler.jsonc`, a comma-separated list such as `"it,en,zh-CN"`; empty (the default) accepts them all. Unknown entries in the list are ignored. Any other `locale` answers `400 validation_error` ("locale must be one of …" with the enabled list), on every route that takes one: sending, events, templates and push. `GET /v1/templates` lists built-ins only in the enabled locales.
+
 ## Idempotency
 
 Send `Idempotency-Key: <key>` on `POST /v1/email/send` and `POST /v1/notifications` so that a retry never sends a second email.

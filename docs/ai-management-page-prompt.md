@@ -30,7 +30,7 @@ Every call: `Authorization: Bearer {NOTIFY_FLOW_API_KEY}`. Errors are `{"error":
 - `GET /v1/templates` → `[{"name","locale","updated_at","builtin"}]`: own templates first, then the built-ins not overridden.
 - `GET /v1/templates/{name}/{locale}` → `{"name","locale","subject","html","text","variables","builtin"}`. There is no fallback to `en`, so a missing one is `404 template_not_found`.
 - `PUT /v1/templates/{name}/{locale}` with `{"subject","html","text","variables":[…]}` creates or replaces. It answers `200` with the stored template.
-  - `name`: `^[a-z0-9-]{1,64}$`. `locale`: `it`, `en` or `pt-BR`.
+  - `name`: `^[a-z0-9-]{1,64}$`. `locale`: `it`, `en`, `pt-BR` or `zh-CN` (only the ones in the deployment's `LOCALES` var, when set).
   - `subject`: 1–255 characters on one line. `html`: at most 100 KB. `text`: at most 50 KB.
   - Placeholders are written `{{name}}`. Each one must be listed in `variables`, as names matching `^[a-zA-Z0-9_]{1,64}$`. Otherwise the call is `400 validation_error`, and its message says what is wrong ("undeclared placeholders: …").
   - A name equal to a built-in overrides it for this app only.

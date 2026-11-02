@@ -1,4 +1,4 @@
-export const LOCALES = ["it", "en", "pt-BR"] as const;
+export const LOCALES = ["it", "en", "pt-BR", "zh-CN"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const isLocale = (value: unknown): value is Locale => (LOCALES as readonly unknown[]).includes(value);
 

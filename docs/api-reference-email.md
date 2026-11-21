@@ -12,7 +12,7 @@ Sends an email from a template, now or (with `Prefer: respond-async`) through th
 |---|---|---|
 | `template` | yes | `^[a-z0-9-]{1,64}$` |
 | `to` | yes | One address, at most 254 characters, printable ASCII only (no accented or IDN addresses). No spaces, commas, line breaks or `<>()[]\;:@"` outside the single `@`, and a dot in the domain. Stored lowercased |
-| `locale` | no | `it`, `en` or `pt-BR`. Default `en` |
+| `locale` | no | `it`, `en`, `pt-BR` or `zh-CN`, limited to [`LOCALES`](api-reference.md#locales) when set. Default `en` |
 | `variables` | yes | An object of strings whose keys are exactly the template's declared variables |
 
 **Template lookup:** your template in `locale`, then the built-in in `locale`, then the same two in `en`. None found → `404 template_not_found`.
@@ -51,7 +51,7 @@ curl -X POST "$NOTIFY_FLOW_URL/v1/email/send" \
 | `login-alert` | `appName`, `name`, `device`, `ipAddress`, `time` |
 | `generic-notification` | `appName`, `title`, `message` |
 
-All exist in `it`, `en` and `pt-BR`. Override one with [`PUT /v1/templates/:name/:locale`](api-reference-config.md#put-v1-templates-name-locale).
+All exist in `it`, `en`, `pt-BR` and `zh-CN`. Override one with [`PUT /v1/templates/:name/:locale`](api-reference-config.md#put-v1-templates-name-locale).
 
 ## GET /v1/email/:id
 

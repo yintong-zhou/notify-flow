@@ -39,8 +39,8 @@ describe("checkVariables", () => {
 });
 
 describe("built-in templates", () => {
-  it("ship 6 templates in it, en and pt-BR", () => {
-    expect(listBuiltins()).toHaveLength(18);
+  it("ship 6 templates in it, en, pt-BR and zh-CN", () => {
+    expect(listBuiltins()).toHaveLength(24);
   });
 
   it("declare every placeholder they use", () => {
@@ -56,6 +56,11 @@ describe("resolveTemplate", () => {
   it("uses the built-in template when the client has none", async () => {
     const { id } = await createClient();
     expect((await resolveTemplate(env.DB, id, "welcome", "it")).subject).toBe("Benvenuto su {{appName}}");
+  });
+
+  it("has Simplified Chinese built-ins", async () => {
+    const { id } = await createClient();
+    expect((await resolveTemplate(env.DB, id, "welcome", "zh-CN")).subject).toBe("欢迎加入 {{appName}}");
   });
 
   it("prefers the client's template for that locale only", async () => {

@@ -39,7 +39,7 @@ Four rules apply to every flow:
 
 - **Tokens:** generate and check tokens in your backend. notify-flow only receives the finished link.
 - **Variables:** always send `appName`: every built-in template uses it in the footer.
-- **Locale:** use the user's language (`it`, `en`, `pt-BR`). If you don't know it, `en` is used.
+- **Locale:** use the user's language (`it`, `en`, `pt-BR`, `zh-CN`). If you don't know it, `en` is used.
 - **Time:** format `time` in the user's time zone and language before sending it, e.g. `Oct 8, 2026, 2:32 PM`.
 
 ## Custom templates

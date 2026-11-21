@@ -15,6 +15,7 @@ const PUSH_TEMPLATES: Record<string, Partial<Record<Locale, PushTemplate>>> = {
     it: { title: "{{appName}}", body: "Hai ricevuto una notifica da {{sender}}", variables: NEW_MESSAGE },
     en: { title: "{{appName}}", body: "You received a notification from {{sender}}", variables: NEW_MESSAGE },
     "pt-BR": { title: "{{appName}}", body: "Você recebeu uma notificação de {{sender}}", variables: NEW_MESSAGE },
+    "zh-CN": { title: "{{appName}}", body: "您收到了来自 {{sender}} 的通知", variables: NEW_MESSAGE },
   },
 };
 

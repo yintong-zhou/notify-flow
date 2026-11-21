@@ -1,5 +1,5 @@
 import { placeholders } from "../templates/renderer";
-import { HttpError, isLocale, type Locale, type Template } from "../types";
+import { HttpError, isLocale, LOCALES, type Locale, type Template } from "../types";
 
 export const MAX_BODY_BYTES = 256 * 1024;
 export const NAME_RE = /^[a-z0-9-]{1,64}$/;
@@ -33,10 +33,23 @@ export async function readJson(req: Request): Promise<Record<string, unknown>> {
   return body as Record<string, unknown>;
 }
 
-export function parseTemplateKey(name: string, locale: string): { name: string; locale: Locale } {
+/**
+ * The locales this deployment accepts: the comma-separated LOCALES var, or every supported locale when it is empty.
+ * Unknown entries are ignored, so a list with no supported locale at all rejects every locale.
+ */
+export function enabledLocales(env: Pick<Env, "LOCALES">): readonly Locale[] {
+  const listed = (env.LOCALES ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return listed.length ? listed.filter(isLocale) : LOCALES;
+}
+
+export function parseLocale(raw: unknown, enabled: readonly Locale[], field = "locale"): Locale {
+  if (!isLocale(raw) || !enabled.includes(raw)) invalid(`${field} must be one of ${enabled.join(", ")}`);
+  return raw;
+}
+
+export function parseTemplateKey(name: string, locale: string, enabled: readonly Locale[]): { name: string; locale: Locale } {
   if (!NAME_RE.test(name)) invalid("name must match ^[a-z0-9-]{1,64}$");
-  if (!isLocale(locale)) invalid("locale must be one of it, en, pt-BR");
-  return { name, locale };
+  return { name, locale: parseLocale(locale, enabled) };
 }
 
 const EVENT_RE = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/;
@@ -87,9 +100,10 @@ function parseTarget(
   locale: unknown,
   variables: unknown,
   names: { to: string; locale: string; variables: string },
+  enabled: readonly Locale[],
 ): { to: string; locale: Locale; variables: Record<string, string> } {
   if (typeof to !== "string" || to.length > 254 || !EMAIL_RE.test(to)) invalid(`${names.to} must be a single valid email address`);
-  if (!isLocale(locale)) invalid(`${names.locale} must be one of it, en, pt-BR`);
+  const parsedLocale = parseLocale(locale, enabled, names.locale);
   if (
     typeof variables !== "object" ||
     variables === null ||
@@ -98,13 +112,14 @@ function parseTarget(
   ) {
     invalid(`${names.variables} must be an object of strings`);
   }
-  return { to: to.toLowerCase(), locale, variables: variables as Record<string, string> };
+  return { to: to.toLowerCase(), locale: parsedLocale, variables: variables as Record<string, string> };
 }
 
-export function parseSendRequest(body: Record<string, unknown>): SendRequest {
+export function parseSendRequest(body: Record<string, unknown>, enabled: readonly Locale[]): SendRequest {
   const { template } = body;
   if (typeof template !== "string" || !NAME_RE.test(template)) invalid("template must match ^[a-z0-9-]{1,64}$");
-  return { template, ...parseTarget(body.to, body.locale ?? "en", body.variables, { to: "to", locale: "locale", variables: "variables" }) };
+  const names = { to: "to", locale: "locale", variables: "variables" };
+  return { template, ...parseTarget(body.to, body.locale ?? "en", body.variables, names, enabled) };
 }
 
 export interface NotificationRequest {
@@ -114,13 +129,13 @@ export interface NotificationRequest {
   variables: Record<string, string>;
 }
 
-export function parseNotification(body: Record<string, unknown>): NotificationRequest {
+export function parseNotification(body: Record<string, unknown>, enabled: readonly Locale[]): NotificationRequest {
   const event = parseEvent(body.event);
   const { recipient } = body;
   if (typeof recipient !== "object" || recipient === null || Array.isArray(recipient)) invalid("recipient must be an object");
   const { email, locale } = recipient as Record<string, unknown>;
   const names = { to: "recipient.email", locale: "recipient.locale", variables: "data" };
-  return { event, ...parseTarget(email, locale ?? "en", body.data, names) };
+  return { event, ...parseTarget(email, locale ?? "en", body.data, names, enabled) };
 }
 
 export function parseIdempotencyKey(req: Request): string | null {

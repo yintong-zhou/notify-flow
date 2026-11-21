@@ -36,6 +36,9 @@ const DEFAULTS: Record<string, Record<Locale, Template>> = {
     "pt-BR": tpl(WELCOME, "Boas-vindas ao {{appName}}",
       "<h1>Olá, {{name}}!</h1><p>Sua conta no {{appName}} está pronta.</p>",
       "Olá, {{name}}!\n\nSua conta no {{appName}} está pronta."),
+    "zh-CN": tpl(WELCOME, "欢迎加入 {{appName}}",
+      "<h1>{{name}}，欢迎您！</h1><p>您的 {{appName}} 账户已准备就绪。</p>",
+      "{{name}}，欢迎您！\n\n您的 {{appName}} 账户已准备就绪。"),
   },
   "verify-email": {
     en: tpl(VERIFY, "Verify your email for {{appName}}",
@@ -47,6 +50,9 @@ const DEFAULTS: Record<string, Record<Locale, Template>> = {
     "pt-BR": tpl(VERIFY, "Confirme seu e-mail no {{appName}}",
       `<p>Olá, {{name}},</p><p>Confirme seu endereço de e-mail para concluir o cadastro no {{appName}}.</p>${button("{{verifyUrl}}", "Confirmar e-mail")}<p>Se você não criou uma conta, ignore este e-mail.</p>`,
       "Olá, {{name}},\n\nConfirme seu endereço de e-mail para concluir o cadastro no {{appName}}:\n{{verifyUrl}}\n\nSe você não criou uma conta, ignore este e-mail."),
+    "zh-CN": tpl(VERIFY, "请验证您在 {{appName}} 的邮箱",
+      `<p>{{name}}，您好：</p><p>请确认您的邮箱地址，以完成 {{appName}} 账户的设置。</p>${button("{{verifyUrl}}", "验证邮箱")}<p>如果您并未创建账户，请忽略此邮件。</p>`,
+      "{{name}}，您好：\n\n请确认您的邮箱地址，以完成 {{appName}} 账户的设置：\n{{verifyUrl}}\n\n如果您并未创建账户，请忽略此邮件。"),
   },
   "password-reset": {
     en: tpl(RESET, "Reset your {{appName}} password",
@@ -58,6 +64,9 @@ const DEFAULTS: Record<string, Record<Locale, Template>> = {
     "pt-BR": tpl(RESET, "Redefina sua senha do {{appName}}",
       `<p>Olá, {{name}},</p><p>Recebemos uma solicitação para redefinir sua senha.</p>${button("{{resetUrl}}", "Redefinir senha")}<p>Se não foi você, ignore este e-mail: sua senha não será alterada.</p>`,
       "Olá, {{name}},\n\nRecebemos uma solicitação para redefinir sua senha:\n{{resetUrl}}\n\nSe não foi você, ignore este e-mail: sua senha não será alterada."),
+    "zh-CN": tpl(RESET, "重置您的 {{appName}} 密码",
+      `<p>{{name}}，您好：</p><p>我们收到了重置您密码的请求。</p>${button("{{resetUrl}}", "重置密码")}<p>如果这不是您本人的操作，请忽略此邮件，您的密码不会被更改。</p>`,
+      "{{name}}，您好：\n\n我们收到了重置您密码的请求：\n{{resetUrl}}\n\n如果这不是您本人的操作，请忽略此邮件，您的密码不会被更改。"),
   },
   "password-changed": {
     en: tpl(CHANGED, "Your {{appName}} password was changed",
@@ -69,6 +78,9 @@ const DEFAULTS: Record<string, Record<Locale, Template>> = {
     "pt-BR": tpl(CHANGED, "Sua senha do {{appName}} foi alterada",
       "<p>Olá, {{name}},</p><p>A senha da sua conta no {{appName}} acabou de ser alterada.</p><p>Se não foi você, redefina sua senha imediatamente e entre em contato com o suporte.</p>",
       "Olá, {{name}},\n\nA senha da sua conta no {{appName}} acabou de ser alterada.\n\nSe não foi você, redefina sua senha imediatamente e entre em contato com o suporte."),
+    "zh-CN": tpl(CHANGED, "您的 {{appName}} 密码已更改",
+      "<p>{{name}}，您好：</p><p>您的 {{appName}} 账户密码刚刚已被更改。</p><p>如果这不是您本人的操作，请立即重置密码并联系客服。</p>",
+      "{{name}}，您好：\n\n您的 {{appName}} 账户密码刚刚已被更改。\n\n如果这不是您本人的操作，请立即重置密码并联系客服。"),
   },
   "login-alert": {
     en: tpl(LOGIN, "New sign-in to your {{appName}} account",
@@ -80,8 +92,11 @@ const DEFAULTS: Record<string, Record<Locale, Template>> = {
     "pt-BR": tpl(LOGIN, "Novo acesso à sua conta do {{appName}}",
       "<p>Olá, {{name}},</p><p>Detectamos um novo acesso à sua conta:</p><ul><li>Dispositivo: {{device}}</li><li>Endereço IP: {{ipAddress}}</li><li>Data e hora: {{time}}</li></ul><p>Se não foi você, altere sua senha imediatamente.</p>",
       "Olá, {{name}},\n\nDetectamos um novo acesso à sua conta:\n- Dispositivo: {{device}}\n- Endereço IP: {{ipAddress}}\n- Data e hora: {{time}}\n\nSe não foi você, altere sua senha imediatamente."),
+    "zh-CN": tpl(LOGIN, "您的 {{appName}} 账户有新的登录",
+      "<p>{{name}}，您好：</p><p>我们检测到您的账户有一次新的登录：</p><ul><li>设备：{{device}}</li><li>IP 地址：{{ipAddress}}</li><li>时间：{{time}}</li></ul><p>如果这不是您本人的操作，请立即修改密码。</p>",
+      "{{name}}，您好：\n\n我们检测到您的账户有一次新的登录：\n- 设备：{{device}}\n- IP 地址：{{ipAddress}}\n- 时间：{{time}}\n\n如果这不是您本人的操作，请立即修改密码。"),
   },
-  "generic-notification": { en: generic, it: generic, "pt-BR": generic },
+  "generic-notification": { en: generic, it: generic, "pt-BR": generic, "zh-CN": generic },
 };
 
 export function builtinTemplate(name: string, locale: Locale): Template | undefined {

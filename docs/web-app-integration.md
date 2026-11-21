@@ -112,7 +112,7 @@ export async function sendEmail(opts: {
   template: string;
   to: string;
   variables: Record<string, string>;
-  locale?: "it" | "en" | "pt-BR";
+  locale?: "it" | "en" | "pt-BR" | "zh-CN";
   idempotencyKey?: string;
 }): Promise<{ id: string; status: string }> {
   const res = await fetch(`${NOTIFY_URL}/v1/email/send`, {

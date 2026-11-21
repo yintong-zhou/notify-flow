@@ -25,7 +25,7 @@ I want to do as little as possible. Only ask me what you can't find out on your 
 
 `POST {NOTIFY_FLOW_URL}/v1/email/send`
 - Headers: `Authorization: Bearer {NOTIFY_FLOW_API_KEY}`, `Content-Type: application/json`, `Idempotency-Key: <1-255 characters, unique per user action>`
-- Body: `{"template": "...", "to": "a single address", "locale": "it" | "en" | "pt-BR", "variables": { ... }}`. `variables` holds strings only, and exactly the variables the template declares.
+- Body: `{"template": "...", "to": "a single address", "locale": "it" | "en" | "pt-BR" | "zh-CN", "variables": { ... }}`. `variables` holds strings only, and exactly the variables the template declares.
 - Success: `200 {"id":"msg_…","status":"submitted"}`. `submitted` means the SMTP server accepted the message, not that it reached the inbox.
 - Error: `{"error":{"code":"…","message":"…"}}`
 
@@ -102,7 +102,7 @@ List the files you will create or change, and which event you will wire to which
    - reports clearly at startup if environment variables are missing.
 3. Wire each flow to its template. Build the Idempotency-Key from stable ids, never from random values generated at retry time.
 4. A failed send must not block the user's request: log the error and carry on. Password reset and sign-up must always answer the same way, whether or not the email is registered.
-5. Map the user's language to `it`/`en`/`pt-BR`, falling back to `en`. Pass `time` already formatted in the user's time zone and language.
+5. Map the user's language to `it`/`en`/`pt-BR`/`zh-CN` (only those your deployment's `LOCALES` var enables, when set), falling back to `en`. Pass `time` already formatted in the user's time zone and language.
 6. If there is old email code, replace it. Ask me before removing dependencies and SMTP credentials that are no longer needed.
 7. For emails without a built-in template, create an idempotent script (`scripts/notify-templates.*`) that uploads the custom templates with PUT in every language used. Fixed copy goes in the template; variables are only for data that changes.
 

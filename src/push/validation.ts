@@ -1,5 +1,5 @@
-import { invalid, NAME_RE } from "../security/validation";
-import { HttpError, isLocale } from "../types";
+import { invalid, NAME_RE, parseLocale } from "../security/validation";
+import { HttpError, type Locale } from "../types";
 import { b64url } from "./crypto";
 import type { PushRequest } from "./sender";
 import type { Subscription } from "./subscriptions";
@@ -95,12 +95,11 @@ function parseVariables(raw: unknown): Record<string, string> {
   return raw as Record<string, string>;
 }
 
-export function parsePushRequest(body: Record<string, unknown>): PushRequest {
+export function parsePushRequest(body: Record<string, unknown>, enabled: readonly Locale[]): PushRequest {
   const userId = parseUserId(body.user_id);
   const { template, url, tag } = body;
   if (typeof template !== "string" || !NAME_RE.test(template)) invalid("template must match ^[a-z0-9-]{1,64}$");
-  const locale = body.locale ?? "en";
-  if (!isLocale(locale)) invalid("locale must be one of it, en, pt-BR");
+  const locale = parseLocale(body.locale ?? "en", enabled);
   const request: PushRequest = { userId, template, locale, variables: parseVariables(body.variables) };
   if (url !== undefined) request.url = parseUrl(url);
   if (tag !== undefined) {

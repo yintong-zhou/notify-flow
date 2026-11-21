@@ -73,7 +73,7 @@ Reads one template: yours, otherwise the built-in. There is no fallback to `en` 
 
 **Response:** `200 {"name","locale","subject","html","text","variables","builtin"}`
 
-**Errors:** `400 validation_error` if `name` breaks `^[a-z0-9-]{1,64}$` or `locale` is not `it`, `en` or `pt-BR`; `404 template_not_found`.
+**Errors:** `400 validation_error` if `name` breaks `^[a-z0-9-]{1,64}$` or `locale` is not an [enabled locale](api-reference.md#locales); `404 template_not_found`.
 
 ## PUT /v1/templates/:name/:locale
 
